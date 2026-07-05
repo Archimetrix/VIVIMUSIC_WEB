@@ -7,7 +7,7 @@
 **Apple Music–style Canvas artwork, synced lyrics, and a full visual overhaul for YouTube Music.**
 
 ![Manifest](https://img.shields.io/badge/Manifest-V3-5b6cf5?style=flat-square)
-![Version](https://img.shields.io/badge/version-1.3.1-5b6cf5?style=flat-square)
+![Version](https://img.shields.io/badge/version-2.0-5b6cf5?style=flat-square)
 ![Browser](https://img.shields.io/badge/Chrome%20%7C%20Edge%20%7C%20Brave-supported-5b6cf5?style=flat-square)
 ![License](https://img.shields.io/badge/license-Unlicensed-lightgrey?style=flat-square)
 
