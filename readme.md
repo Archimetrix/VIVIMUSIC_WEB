@@ -68,7 +68,7 @@ This extension is **not published on the Chrome Web Store**. It's distributed as
    (For Brave: `brave://extensions` · For Vivaldi: `vivaldi://extensions` · For Opera: `opera://extensions`)
 4. Turn on **Developer mode** — the toggle is in the top-right corner of the extensions page.
 5. Click **Load unpacked**.
-6. Select the folder you extracted in step 2 (the one that directly contains `manifest.json`).
+6. Select the folder you extracted and open the folder you will see icon and src folder when you see these two folders dont click on them just click open to select (the one that directly contains `manifest.json`).
 7. Vivimusic Web should now appear in your extensions list and in your toolbar. Open **[music.youtube.com](https://music.youtube.com)**, play a song, and you should see the new theme and Canvas artwork kick in within a second or two.
 
 ### Microsoft Edge
