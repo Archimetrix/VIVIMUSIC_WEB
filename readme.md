@@ -4,18 +4,17 @@
 
 # Vivimusic Web
 
-**Apple Music–style Canvas artwork, synced lyrics, and a full visual overhaul for YouTube Music.**
+**Apple Music–style Canvas artwork, synced lyrics, Last.fm scrobbling, and a full visual overhaul for YouTube Music.**
 
 ![Manifest](https://img.shields.io/badge/Manifest-V3-5b6cf5?style=flat-square)
-![Version](https://img.shields.io/badge/version-2.0-5b6cf5?style=flat-square)
+![Version](https://img.shields.io/badge/version-2.1-5b6cf5?style=flat-square)
 ![Browser](https://img.shields.io/badge/Chrome%20%7C%20Edge%20%7C%20Brave-supported-5b6cf5?style=flat-square)
-![License](https://img.shields.io/badge/license-Unlicensed-lightgrey?style=flat-square)
 
 </div>
 
 ---
 
-Vivimusic Web is a browser extension that reskins **[music.youtube.com](https://music.youtube.com)** with animated Canvas-style backgrounds (like Apple Music/Spotify Canvas), word-synced lyrics, and a dark, glassy theme — without needing a separate desktop app or a Chrome Web Store install.
+Vivimusic Web is a browser extension that reskins **[music.youtube.com](https://music.youtube.com)** with animated Canvas-style backgrounds (like Apple Music/Spotify Canvas), word-synced lyrics, Last.fm scrobbling, and a dark, glassy theme — without needing a separate desktop app or a Chrome Web Store install.
 
 This extension is **not published on the Chrome Web Store**. It's distributed as source from this repository and loaded manually as an "unpacked" extension. Follow the installation guide below — it takes about a minute.
 
@@ -30,9 +29,9 @@ This extension is **not published on the Chrome Web Store**. It's distributed as
   - [Firefox](#firefox)
 - [Updating](#updating)
 - [Settings](#settings)
+- [Last.fm Scrobbling](#lastfm-scrobbling)
 - [Permissions & Privacy](#permissions--privacy)
 - [Troubleshooting](#troubleshooting)
-- [Project Structure](#project-structure)
 - [Credits](#credits)
 - [License](#license)
 
@@ -48,9 +47,9 @@ This extension is **not published on the Chrome Web Store**. It's distributed as
   - BetterLyrics (Legacy)
   - LRCLIB
 - 📑 **Auto-open Lyrics Tab** — Optionally jumps straight to the Lyrics tab when a track starts.
-- 🖤 **Full Theme Reskin** — A dark, blurred-glass redesign of the entire YouTube Music UI, independent of the Canvas feature (can be toggled off separately).
+- 🎧 **Last.fm Scrobbling** — Logs in with your Last.fm username and password (no browser redirect needed) and scrobbles what you listen to, sends Now Playing status, and syncs Likes/Unlikes as Loves/Unloves on Last.fm.
 - 💾 **Local Artwork Cache** — Previously fetched artwork/Canvas videos are cached locally so repeat plays load instantly. Viewable and clearable from the popup.
-- 🔔 **Update Checker** — Since this isn't on the Web Store, the popup can check this GitHub repo's [Releases](../../releases) page and let you know when a newer version is out (see [Updating](#updating) — it notifies you, it does not auto-install).
+- 🔔 **Update Checker** — Since this isn't on the Web Store, the popup can check this GitHub repo's [Releases](../../releases) page and let you know when a newer version is out see updating — it notifies you, it does not auto-install).
 
 ---
 
@@ -60,9 +59,7 @@ This extension is **not published on the Chrome Web Store**. It's distributed as
 
 ### Chrome / Brave / Vivaldi / Opera
 
-1. **Download the code**
-   - Click the green **`Code`** button on this repository → **`Download ZIP`**
-   - *(or, if you use git: `git clone https://github.com/Archimetrix/VIVIMUSIC_WEB.git`)*
+1. **Download The Zipfile From Releases**
 2. **Extract it** to a folder you won't move or delete later (e.g. `Documents/Vivimusic Web`). Chrome loads the extension directly from this folder, so if you delete it, the extension breaks.
 3. Open your browser and go to:
    ```
@@ -86,13 +83,11 @@ This extension is built for Manifest V3 (Chromium-based browsers) and is **not c
 
 ## Updating
 
-Chrome will not silently auto-update an extension that was loaded unpacked — that's only possible for extensions installed from the Chrome Web Store. To update Vivimusic Web:
+ To update Vivimusic Web:
 
 1. Open the extension popup — if a newer version is available, you'll see an **"Update available"** notice (checked automatically twice a day, or manually via **Check for updates** in the popup).
 2. Download the latest release from the [Releases page](../../releases) (or pull the latest `main` branch).
-3. Extract it **over the same folder** you used originally (replacing the old files).
-4. Go back to `chrome://extensions` and click the **Reload** (circular arrow) icon on the Vivimusic Web card.
-
+3. Extract it and again load unpack it then it will be updated .
 That's it — no need to remove and re-add the extension.
 
 ---
@@ -108,8 +103,35 @@ All settings live in the extension popup (click the Vivimusic icon in your toolb
 | **Auto-open Lyrics tab** | Automatically switches to the Lyrics tab when a new track starts. |
 | **Lyrics providers** | Toggle individual lyrics sources on/off, in priority order. |
 | **THEME** | Toggles the full visual reskin independently of Canvas/Lyrics. |
+| **Last.fm scrobbling** | Turns Last.fm integration on or off entirely. |
+| **Send Now Playing** | Sends a "Now Playing" update to Last.fm as soon as a track starts. |
+| **Send Likes/Unlikes** | Mirrors the YouTube Music like button to Last.fm Love/Unlove. |
+| **Min. song length (sec)** | Tracks shorter than this are never scrobbled. |
+| **Scrobble delay (%)** | Scrobble once this percentage of the track has played. |
+| **Scrobble delay (min)** | Or once this many minutes have played — whichever threshold is reached first. |
 | **Artwork Cache** | Shows how many songs are cached locally, with a one-click **Clear all**. |
 | **Check for updates** | Manually checks this repo's latest release against your installed version. |
+
+---
+
+## Last.fm Scrobbling
+
+Vivimusic Web can scrobble what you listen to on YouTube Music straight to your Last.fm profile.
+
+**Logging in:**
+1. Open the popup and switch on **Last.fm scrobbling**.
+2. Enter your Last.fm **username** and **password** and click **Connect Last.fm account**.
+3. Your password is sent once, directly to Last.fm's own API, and is never stored — only the session token Last.fm returns is saved locally, and it can be revoked any time from your Last.fm account's **Applications** settings without changing your password.
+
+**How scrobble timing works:**
+A track is scrobbled once it has played past *whichever comes first*:
+- the configured **percentage** of its total duration, or
+- the configured **number of minutes**,
+
+as long as the track is longer than the configured **minimum song length**. These three thresholds are all adjustable in the popup.
+
+**Likes/Unlikes:**
+When enabled, liking or unliking a song in YouTube Music sends a matching Love/Unlove to Last.fm.
 
 ---
 
@@ -125,8 +147,9 @@ Vivimusic Web only requests what it needs to function, and only runs on `music.y
 | Host access to `music.youtube.com` | Where the extension actually runs and injects its UI. |
 | Host access to `artwork.boidu.dev`, `lyrics-api.boidu.dev`, `lrclib.net` | Third-party APIs used to fetch Canvas artwork and lyrics for the currently playing song. |
 | Host access to `api.github.com` | Used solely to check the latest release tag for the update notice — no data is sent, it's a simple read-only GET request. |
+| Host access to `ws.audioscrobbler.com` | Last.fm's API — used only if you enable and log in to Last.fm scrobbling. Sends the current artist/track (and your login once, to establish a session) directly to Last.fm; nothing is sent anywhere else. |
 
-Nothing is sent to any server other than a song/artist lookup (to fetch artwork or lyrics) and the anonymous GitHub release check. No analytics, no tracking, no accounts.
+Nothing is sent to any server other than a song/artist lookup (to fetch artwork or lyrics), the anonymous GitHub release check, and — only if you opt in — scrobble data sent to Last.fm's own API. No analytics, no tracking, no third-party accounts beyond Last.fm itself if you choose to connect one.
 
 ---
 
@@ -144,34 +167,35 @@ The folder you extracted the extension to was moved, renamed, or deleted. Re-ext
 **Lyrics aren't showing for a song.**
 Not every song has synced lyrics available from any provider. Try toggling different providers on/off in the popup — coverage varies per source.
 
+**Last.fm login fails.**
+Double-check your username and password (not your email, unless that's what you normally log in with). If it still fails, your Last.fm account may have two-factor or app-specific restrictions — try generating the connection again after a few minutes.
+
+**Scrobbles aren't showing up on Last.fm.**
+Check that **Last.fm scrobbling** is switched on and you're shown as connected in the popup. Remember scrobbles only send after your configured percentage/minutes threshold is reached, not the instant a song starts (that's what "Now Playing" is for).
+
+**Song/Video toggle button doesn't appear, or is in the wrong spot.**
+YouTube Music's layout changes occasionally, which can shift where this button gets injected. Open an issue with a screenshot of the player bar.
+
 **Something looks visually broken after a YouTube Music redesign.**
 YouTube Music's own layout changes occasionally, which can break selectors this extension relies on. Open an issue on this repository with a screenshot and the URL/page you were on.
-
----
-
-## Project Structure
-
-```
-VIVIMUSIC_WEB/
-├── manifest.json          # Extension manifest (Manifest V3)
-├── icons/                 # Extension icons (16 / 48 / 128 px)
-└── src/
-    ├── background.js      # Service worker — handles the GitHub update check
-    ├── content.js          # Injects Canvas artwork/background into the player
-    ├── lyrics.js           # Fetches & parses lyrics from the configured providers
-    ├── lyrics-ui.js        # Renders the custom lyrics panel
-    ├── canvas.css          # Styles for the injected Canvas artwork layer
-    ├── theme.css           # The full YouTube Music theme reskin
-    ├── popup.html           # Extension popup UI
-    └── popup.js             # Popup logic (settings, cache, update checks)
-```
 
 ---
 
 ## Credits
 
 - Built and maintained by **Archimetrix**
-- Theme design foundation by **Cheng**
+- Theme design foundation by **Chengggit**
 - Lyrics data via **BetterLyrics** and **[LRCLIB](https://lrclib.net)**
+- Scrobbling powered by **[Last.fm](https://www.last.fm)**
 
 ---
+
+## License
+
+Copyright (c) 2026 [Archimetrix]. All rights reserved.
+
+This software and associated documentation files (the "Software") are proprietary 
+and confidential. No part of this Software may be reproduced, distributed, 
+transmitted, transcribed, stored in a retrieval system, or translated into 
+any human or computer language, in any form or by any means, without the 
+prior written permission of the copyright owner.
