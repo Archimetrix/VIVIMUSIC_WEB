@@ -7,7 +7,7 @@
 **Apple Music–style Canvas artwork, synced lyrics, Last.fm scrobbling, and a full visual overhaul for YouTube Music.**
 
 ![Manifest](https://img.shields.io/badge/Manifest-V3-5b6cf5?style=flat-square)
-![Version](https://img.shields.io/badge/version-3.0-5b6cf5?style=flat-square)
+![Version](https://img.shields.io/badge/version-4.0-5b6cf5?style=flat-square)
 ![Browser](https://img.shields.io/badge/Chrome%20%7C%20Edge%20%7C%20Brave-supported-5b6cf5?style=flat-square)
 
 </div>
@@ -46,7 +46,9 @@ This extension is **not published on the Chrome Web Store**. It's distributed as
   - BetterLyrics (Kugou)
   - BetterLyrics (Legacy)
   - LRCLIB
+  - Spotify
 - 📑 **Auto-open Lyrics Tab** — Optionally jumps straight to the Lyrics tab when a track starts.
+- 🖼️ **Spotify Canvas** - Spotify Canvas support for yt songs (require login in spotify)
 - 🎧 **Last.fm Scrobbling** — Logs in with your Last.fm username and password (no browser redirect needed) and scrobbles what you listen to, sends Now Playing status, and syncs Likes/Unlikes as Loves/Unloves on Last.fm.
 - 💾 **Local Artwork Cache** — Previously fetched artwork/Canvas videos are cached locally so repeat plays load instantly. Viewable and clearable from the popup.
 - 🔔 **Update Checker** — Since this isn't on the Web Store, the popup can check this GitHub repo's [Releases](../../releases) page and let you know when a newer version is out see updating — it notifies you, it does not auto-install).
