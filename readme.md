@@ -7,7 +7,7 @@
 **Apple Music–style Canvas artwork, synced lyrics, Last.fm scrobbling, and a full visual overhaul for YouTube Music.**
 
 ![Manifest](https://img.shields.io/badge/Manifest-V3-5b6cf5?style=flat-square)
-![Version](https://img.shields.io/badge/version-4.0-5b6cf5?style=flat-square)
+![Version](https://img.shields.io/badge/version-5.0-5b6cf5?style=flat-square)
 ![Browser](https://img.shields.io/badge/Chrome%20%7C%20Edge%20%7C%20Brave-supported-5b6cf5?style=flat-square)
 
 </div>
@@ -40,6 +40,7 @@ This extension is **not published on the Chrome Web Store**. It's distributed as
 ## Features
 
 - 🎨 **Canvas Artwork** — Fetches animated, Apple Music–style Canvas videos (or high-res artwork as a fallback) for the currently playing song and blends it into the player thumbnail and page background.
+- 🖼️ **Spotify Canvas** - Spotify Canvas support for yt songs (require login in spotify)
 - 🎤 **Synced Lyrics** — Word-synced lyrics when available, falling back to line-synced, then plain lyrics. Pulled from multiple providers so you almost always get *something*.
 - 🔀 **Multiple Lyrics Providers** — Toggle individual sources on or off:
   - BetterLyrics (word-sync / TTML)
@@ -47,8 +48,13 @@ This extension is **not published on the Chrome Web Store**. It's distributed as
   - BetterLyrics (Legacy)
   - LRCLIB
   - Spotify
+  - Musixmatch
+  - Unison 
 - 📑 **Auto-open Lyrics Tab** — Optionally jumps straight to the Lyrics tab when a track starts.
-- 🖼️ **Spotify Canvas** - Spotify Canvas support for yt songs (require login in spotify)
+- 🥇 **Lyrics Provider Priority** - prioritize user selected lyrics provider .
+- 🎶 **Lyrics Offset** -Adjust lyrics timeline .(saved locally)
+- 💃 **REZE Dance** - Reze dance when no lyrics found .
+- ❌ **Sponsorblock** - Sponsorblock skips nonmusic parts.
 - 🎧 **Last.fm Scrobbling** — Logs in with your Last.fm username and password (no browser redirect needed) and scrobbles what you listen to, sends Now Playing status, and syncs Likes/Unlikes as Loves/Unloves on Last.fm.
 - 💾 **Local Artwork Cache** — Previously fetched artwork/Canvas videos are cached locally so repeat plays load instantly. Viewable and clearable from the popup.
 - 🔔 **Update Checker** — Since this isn't on the Web Store, the popup can check this GitHub repo's [Releases](../../releases) page and let you know when a newer version is out see updating — it notifies you, it does not auto-install).
