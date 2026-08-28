@@ -8,7 +8,7 @@
 
 ![Manifest](https://img.shields.io/badge/Manifest-V3-5b6cf5?style=flat-square)
 ![Version](https://img.shields.io/badge/version-5.0-5b6cf5?style=flat-square)
-![Browser](https://img.shields.io/badge/Chrome%20%7C%20Edge%20%7C%20Brave-supported-5b6cf5?style=flat-square)
+![Browser](https://img.shields.io/badge/Chrome%20%7C%20Edge%20%7C%20Brave%20%7C%20OtherChromiumBrowsers-supported-5b6cf5?style=flat-square)
 
 </div>
 
