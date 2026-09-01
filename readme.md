@@ -28,7 +28,7 @@ This extension is **not published on the Chrome Web Store**. It's distributed as
   <img src="icons/vivimusicweb.gif" alt="Vivimusic Web demo — click to watch the full video" width="720" />
 </a>
 
-**Click the preview above to watch the full video** (GitHub can't play video files inline, so this is a looping GIF preview linking out to the actual video: [https://files.catbox.moe/ycpt9e.mp4](https://files.catbox.moe/ycpt9e.mp4))
+**Click the preview above to watch the full video** 
 
 </div>
 
