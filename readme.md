@@ -7,7 +7,7 @@
 **Apple Music–style Canvas artwork, synced lyrics, Last.fm scrobbling, and a full visual overhaul for YouTube Music.**
 
 ![Manifest](https://img.shields.io/badge/Manifest-V3-5b6cf5?style=flat-square)
-![Version](https://img.shields.io/badge/version-6-5b6cf5?style=flat-square)
+![Version](https://img.shields.io/badge/version-7.1-5b6cf5?style=flat-square)
 ![Browser](https://img.shields.io/badge/Chrome%20%7C%20Edge%20%7C%20Brave%20%7C%20OtherChromiumBrowsers-supported-5b6cf5?style=flat-square)
 
 </div>
@@ -68,6 +68,7 @@ This extension is **not published on the Chrome Web Store**. It's distributed as
   - Spotify
   - Musixmatch
   - Unison
+  - BiniLyrics
 - 📑 **Auto-open Lyrics Tab** — Optionally jumps straight to the Lyrics tab when a track starts.
 - 🎬 **Lyrics on Video Tracks** — Toggle whether the synced lyrics panel also shows up for tracks played as music videos, not just audio-only songs.
 - 🥇 **Lyrics Provider Priority** — Reorder and prioritize which lyrics provider is tried first, with an optional "wait for priority source" toggle before falling back to others.
