@@ -4,7 +4,7 @@
 
 # Vivimusic Web
 
-**Apple Music–style Canvas artwork, synced lyrics, Last.fm scrobbling, and a full visual overhaul for YouTube Music.**
+**Apple Music–style Canvas artwork,Spotify canvas, synced lyrics, Last.fm scrobbling, and a full visual animations overhaul for YouTube Music.**
 
 ![Manifest](https://img.shields.io/badge/Manifest-V3-5b6cf5?style=flat-square)
 ![Version](https://img.shields.io/badge/version-7.1-5b6cf5?style=flat-square)
