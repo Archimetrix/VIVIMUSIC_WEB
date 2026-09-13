@@ -101,9 +101,8 @@ This extension is **not published on the Chrome Web Store**. It's distributed as
 6. Select the folder you extracted and open the folder you will see icon and src folder when you see these two folders dont click on them just click open to select (the one that directly contains `manifest.json`).
 7. Vivimusic Web should now appear in your extensions list and in your toolbar. Open **[music.youtube.com](https://music.youtube.com)**, play a song, and you should see the new theme and Canvas artwork kick in within a second or two.
 
-### Microsoft Edge
-
-Same as above, using `edge://extensions` instead of `chrome://extensions`. Edge calls the same feature **Developer mode**, in the left sidebar.
+**Click On the image below for extension installation guide video :-**
+[![Extension Installation Guide](https://i.postimg.cc/tC00y0XF/Screenshot-2026-09-13-195414.png)](https://youtu.be/HIBwMWksrTg)
 
 ### Firefox
 
