@@ -106,8 +106,7 @@ This extension is **not published on the Chrome Web Store**. It's distributed as
 
 ### Firefox
 
-This extension is built for Manifest V3 (Chromium-based browsers) and is **not currently packaged for Firefox**. Loading it as a temporary add-on via `about:debugging` may partially work, but some features (like the background service worker) are not guaranteed to behave the same way. Chromium-based browsers are recommended.
-
+Currently only chromium browsers are supported .. it will not work on firefox .
 ---
 
 ## Updating
