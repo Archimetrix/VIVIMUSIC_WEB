@@ -7,7 +7,7 @@
 **Apple Music–style Canvas artwork, Spotify Canvas, synced lyrics, Last.fm scrobbling, and a Spotify → YouTube Music playlist transfer tool for YouTube Music.**
 
 ![Manifest](https://img.shields.io/badge/Manifest-V3-5b6cf5?style=flat-square)
-![Version](https://img.shields.io/badge/version-7.2-5b6cf5?style=flat-square)
+![Version](https://img.shields.io/badge/version-8.2-5b6cf5?style=flat-square)
 ![Browser](https://img.shields.io/badge/Chrome%20%7C%20Edge%20%7C%20Brave%20%7C%20OtherChromiumBrowsers-supported-5b6cf5?style=flat-square)
 
 </div>
