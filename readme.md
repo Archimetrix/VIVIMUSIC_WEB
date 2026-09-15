@@ -6,11 +6,10 @@
 
 **Apple Music–style Canvas artwork, Spotify Canvas, synced lyrics, Last.fm scrobbling, and a Spotify → YouTube Music playlist transfer tool for YouTube Music.**
 
-![Manifest](https://img.shields.io/badge/Manifest-V3-5b6cf5?style=flat-square)
-![Version](https://img.shields.io/badge/version-8.2-5b6cf5?style=flat-square)
-![Browser](https://img.shields.io/badge/Chrome%20%7C%20Edge%20%7C%20Brave%20%7C%20OtherChromiumBrowsers-supported-5b6cf5?style=flat-square)
-[![License](https://img.shields.io/badge/License-Copyright%20%C2%A9%202026%20Archimetrix.%20All%20rights%20reserved-5b6cf5?style=flat-square)](LICENSE)
-
+[![Manifest](https://img.shields.io/badge/Manifest-V3-ff6b6b?style=flat-square)](#)
+[![Version](https://img.shields.io/badge/Version-8.2-4ecdc4?style=flat-square)](#)
+[![Browsers](https://img.shields.io/badge/Chrome%20%7C%20Edge%20%7C%20Brave%20%7C%20Other%20Chromium%20Browsers-supported-6c5ce7?style=flat-square)](#)
+[![Copyright](https://img.shields.io/badge/Copyright-%C2%A9%202026%20Archimetrix.%20All%20rights%20reserved-f39c12?style=flat-square)](LICENSE)
 </div>
 
 ---
