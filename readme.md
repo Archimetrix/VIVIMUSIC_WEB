@@ -4,10 +4,10 @@
 
 # Vivimusic Web
 
-**Apple Music–style Canvas artwork,Spotify canvas, synced lyrics, Last.fm scrobbling, and a full visual animations overhaul for YouTube Music.**
+**Apple Music–style Canvas artwork, Spotify Canvas, synced lyrics, Last.fm scrobbling, and a Spotify → YouTube Music playlist transfer tool for YouTube Music.**
 
 ![Manifest](https://img.shields.io/badge/Manifest-V3-5b6cf5?style=flat-square)
-![Version](https://img.shields.io/badge/version-7.1-5b6cf5?style=flat-square)
+![Version](https://img.shields.io/badge/version-7.2-5b6cf5?style=flat-square)
 ![Browser](https://img.shields.io/badge/Chrome%20%7C%20Edge%20%7C%20Brave%20%7C%20OtherChromiumBrowsers-supported-5b6cf5?style=flat-square)
 
 </div>
@@ -45,6 +45,7 @@ This extension is **not published on the Chrome Web Store**. It's distributed as
 - [Updating](#updating)
 - [Settings](#settings)
 - [Spotify Canvas Login](#spotify-canvas-login)
+- [Spotify → YouTube Music Playlist Transfer](#spotify--youtube-music-playlist-transfer)
 - [Last.fm Scrobbling](#lastfm-scrobbling)
 - [Permissions & Privacy](#permissions--privacy)
 - [Troubleshooting](#troubleshooting)
@@ -56,7 +57,8 @@ This extension is **not published on the Chrome Web Store**. It's distributed as
 ## Features
 
 - 🎨 **Canvas Artwork** — Fetches animated, Apple Music–style Canvas videos (or high-res artwork as a fallback) for the currently playing song and blends it into the player thumbnail and page background.
-- 🖼️ **Spotify Canvas** — Spotify Canvas support for YT Music songs. Connect either with a one-click Spotify login or by pasting your `sp_dc` cookie manually (useful on browsers like Brave where the popup login flow needs an extra step — see [Spotify Canvas Login](#spotify-canvas-login)).
+- 🖼️ **Spotify Canvas** — Spotify Canvas support for YT Music songs. Connect with a one-click Spotify login or by supplying your `sp_dc` cookie locally.
+- 🔄 **Spotify → YouTube Music Playlist Transfer** — Transfer your Spotify playlists directly from the browser into YouTube Music without sending your library to a VIVIMUSIC server. Select one or multiple Spotify playlists, match each track against YouTube Music, create private destination playlists, and add the matched videos while preserving playlist order.
 - 🌊 **Kawarp Background Engine** — The animated Canvas background is fully tunable from the popup: opacity, warp intensity, blur passes, saturation, dithering, animation speed, and transition duration all have live sliders, plus a "pause when inactive" toggle and a one-click **Reset to defaults** button. There's also an "artwork/image-only" mode if you'd rather skip the warped background animation entirely and just show static art.
 - 🎚️ **Built-in Equalizer** — A toggleable audio equalizer for YouTube Music playback.
 - 🎤 **Synced Lyrics** — Word-synced lyrics when available, falling back to line-synced, then plain lyrics. Pulled from multiple providers so you almost always get *something*.
@@ -75,11 +77,11 @@ This extension is **not published on the Chrome Web Store**. It's distributed as
 - 🎶 **Lyrics Offset** — Adjust the lyrics timeline sync per-track (saved locally).
 - 💃 **REZE Dance** — An animated dancer plays when no lyrics can be found for a track, toggleable in the popup.
 - ⏭️ **Sponsorblock** — Automatically skips non-music segments (intros, sponsor spots, etc.) using Sponsorblock data.
-- 🎧 **Last.fm Scrobbling** — Logs in with your Last.fm username and password (no browser redirect needed) and scrobbles what you listen to, sends Now Playing status, and syncs Likes/Unlikes as Loves/Unloves on Last.fm.
+- 🎧 **Last.fm Scrobbling** — Logs in with your Last.fm username and password and scrobbles what you listen to, sends Now Playing status, and can sync Likes/Unlikes as Loves/Unloves on Last.fm.
 - 💾 **Local Artwork Cache** — Previously fetched artwork/Canvas videos are cached locally so repeat plays load instantly. Viewable and clearable from the popup.
-- 🦁 **Brave Browser Fix Guide** — A built-in walkthrough (accessible from an info button in the popup) for resolving Spotify login quirks specific to Brave's shields/cookie handling.
+- 🦁 **Brave Browser Fix Guide** — A built-in walkthrough for resolving Spotify login quirks specific to Brave's shields/cookie handling.
 - 🎨 **THEME** — A full dark, glassy visual reskin of YouTube Music, toggleable independently of Canvas and Lyrics.
-- 🔔 **Update Checker** — Since this isn't on the Web Store, the popup can check this GitHub repo's [Releases](../../releases) page and let you know when a newer version is out (see [Updating](#updating) — it notifies you, it does not auto-install).
+- 🔔 **Update Checker** — Since this isn't on the Web Store, the popup can check this GitHub repo's [Releases](../../releases) page and let you know when a newer version is out. It does not auto-install updates.
 
 ---
 
@@ -139,6 +141,7 @@ All settings live in the extension popup (click the Vivimusic icon in your toolb
 | **Prioritize provider** | Enables custom lyrics provider priority ordering, with a "wait for priority source" toggle. |
 | **THEME** | Toggles the full visual reskin independently of Canvas/Lyrics. |
 | **Spotify Canvas** | Enables Spotify Canvas videos for YT Music tracks; connect via login or `sp_dc` cookie. |
+| **Spotify → YouTube Music** | Opens the client-side Spotify playlist transfer tool. Select one or multiple normal Spotify playlists and transfer them into private YouTube Music playlists. Spotify Liked Songs are not currently supported. |
 | **Last.fm scrobbling** | Turns Last.fm integration on or off entirely. |
 | **Send Now Playing** | Sends a "Now Playing" update to Last.fm as soon as a track starts. |
 | **Send Likes/Unlikes** | Mirrors the YouTube Music like button to Last.fm Love/Unlove. |
@@ -160,6 +163,60 @@ To get Spotify Canvas videos on YouTube Music tracks, connect a Spotify account 
 If you're on Brave and hitting login issues, click the **"Using Brave Browser?"** info button in the popup for a step-by-step fix guide built into the extension.
 
 Once connected, you'll see your connected account shown in the popup with a **Disconnect Spotify** option to revoke access at any time.
+
+
+---
+
+## Spotify → YouTube Music Playlist Transfer
+
+Vivimusic Web can transfer normal Spotify playlists into YouTube Music directly from your browser. The transfer runs client-side: playlist metadata and track information are processed by the extension in your browser, and the extension talks directly to Spotify and YouTube Music using the sessions you already have open.
+
+### What it supports
+
+- Select one or multiple Spotify playlists.
+- Read the songs in each selected playlist.
+- Search YouTube Music for each Spotify track using title and artist information.
+- Create a matching **private** YouTube Music playlist for each Spotify playlist.
+- Add matched YouTube Music videos in the same order as the Spotify playlist.
+- Continue through a playlist when an individual track cannot be matched, and show progress in the transfer log.
+
+### What it does not require
+
+This feature does **not** require a Spotify Developer account, Spotify Client ID/secret, Google Cloud project, OAuth app registration, VIVIMUSIC server, Render deployment, database, or separate transfer application. It uses the user's existing logged-in browser sessions.
+
+### Authentication model
+
+**Spotify:** Open Spotify and sign in normally. Vivimusic reads the existing Spotify Web Player `sp_dc` session cookie and uses Spotify's own Web Player session flow to obtain the session needed to read playlists. The extension never asks for or stores your Spotify password.
+
+**YouTube Music:** Open [music.youtube.com](https://music.youtube.com) and sign in normally. The transfer uses the logged-in YouTube Music page and its own browser session/configuration to search, create, and update playlists. The extension never asks for or stores your Google password.
+
+### Important implementation note
+
+The transfer feature uses internal web interfaces exposed by Spotify and YouTube Music rather than their public developer APIs. This is why no developer application credentials are required, but those internal interfaces are not stable public APIs and can change without notice. A future Spotify or Google web-client change may require an extension update.
+
+### Privacy model
+
+There is no VIVIMUSIC transfer server in the data path:
+
+```text
+Spotify session
+      ↓
+Vivimusic Web extension (your browser)
+      ↓
+YouTube Music session
+      ↓
+Private YouTube Music playlists
+```
+
+The extension does not upload your Spotify library to a VIVIMUSIC backend. Spotify and YouTube Music still receive the requests required for the transfer because they are the services being read from and written to.
+
+### Transfer safety
+
+Keep the transfer page open until the operation finishes. Do not close the YouTube Music tab, switch apps, or intentionally interrupt the browser while matching and playlist updates are running. The current implementation uses a page bridge inside the logged-in YouTube Music tab, so keeping that environment intact reduces the chance of an interrupted transfer.
+
+### Current limitation: Spotify Liked Songs
+
+Spotify **Liked Songs** are intentionally excluded from the transfer UI. Normal Spotify playlists are supported and have been tested with the current implementation, while the Liked Songs collection is exposed differently by Spotify's internal web data model. Rather than create an unreliable or misleading transfer option, Vivimusic currently focuses on standard Spotify playlists.
 
 ---
 
@@ -196,13 +253,13 @@ Vivimusic Web only requests what it needs to function, and only runs on `music.y
 | `cookies` | Used only for Spotify Canvas login (reading/managing the `sp_dc` session cookie needed to fetch Canvas videos on your behalf). |
 | Host access to `music.youtube.com` | Where the extension actually runs and injects its UI. |
 | Host access to `artwork.boidu.dev`, `lyrics-api.boidu.dev`, `lrclib.net`, `apic-desktop.musixmatch.com` | Third-party lyrics and artwork APIs used to fetch Canvas artwork and synced lyrics for the currently playing song. |
-| Host access to `open.spotify.com`, `api.spotify.com`, `api-partner.spotify.com`, `spclient.wg.spotify.com`, `apresolve.spotify.com`, `clienttoken.spotify.com`, `canvaz.scdn.co` | Spotify's own endpoints, used only if you connect a Spotify account, to look up and fetch Canvas videos for the currently playing song. |
+| Host access to `open.spotify.com`, `api.spotify.com`, `api-partner.spotify.com`, `spclient.wg.spotify.com`, `apresolve.spotify.com`, `clienttoken.spotify.com`, `canvaz.scdn.co` | Spotify's own endpoints, used for Spotify Canvas and for the Spotify → YouTube Music playlist transfer. The transfer reads normal Spotify playlist data from Spotify's logged-in Web Player session. |
 | Host access to `sponsor.ajay.app` | Sponsorblock's API — used only if Sponsorblock is enabled, to fetch skip segments for the currently playing video. |
-| Host access to `song.link`, `code.thetadev.de` | Used to help resolve/match tracks across services (e.g. matching a YT Music track to its Spotify equivalent). |
+| Host access to `song.link`, `code.thetadev.de` | Used by other Vivimusic track-resolution features. The Spotify → YouTube Music transfer itself performs its matching against YouTube Music directly. |
 | Host access to `api.github.com`, `github.com` | Used solely to check the latest release tag for the update notice — no data is sent, it's a simple read-only GET request. |
 | Host access to `ws.audioscrobbler.com` | Last.fm's API — used only if you enable and log in to Last.fm scrobbling. Sends the current artist/track (and your login once, to establish a session) directly to Last.fm; nothing is sent anywhere else. |
 
-Nothing is sent to any server other than a song/artist lookup (to fetch artwork, lyrics, or Canvas), the anonymous GitHub release check, Sponsorblock segment lookups if enabled, and — only if you opt in — scrobble data sent to Last.fm's own API. No analytics, no tracking, no third-party accounts beyond Spotify and Last.fm themselves if you choose to connect them.
+Nothing is sent to a VIVIMUSIC-owned server. The extension communicates directly with the external services needed by the enabled features: Spotify, YouTube Music, artwork/lyrics providers, GitHub for the release check, Sponsorblock if enabled, and Last.fm if you opt in to scrobbling. For the Spotify → YouTube Music transfer, Spotify playlist data is read locally by the extension and YouTube Music receives the search/playlist-update requests needed to perform the transfer. No analytics, no tracking, no third-party accounts beyond Spotify and Last.fm themselves if you choose to connect them.
 
 ---
 
@@ -216,6 +273,15 @@ You selected the wrong folder — make sure you pick the folder that directly co
 
 **Extension disappeared / shows an error icon after a browser restart.**
 The folder you extracted the extension to was moved, renamed, or deleted. Re-extract it somewhere permanent and reload it via `chrome://extensions`.
+
+**Spotify → YouTube Music says Spotify is not connected.**
+Open Spotify and make sure you are fully signed in. Then return to the transfer page and click **Refresh**. Vivimusic uses the existing Spotify Web Player session rather than a separate Spotify developer login.
+
+**Spotify playlists appear, but a transfer stops or the YouTube Music bridge times out.**
+Keep the transfer page open and make sure a YouTube Music tab is also open and signed in. Do not close the YT Music tab or interrupt the browser while the transfer is running. Reload `music.youtube.com` and retry if the page was left idle for a long time.
+
+**A Spotify playlist cannot be transferred because some songs are missing.**
+The matcher searches YouTube Music and selects the best candidate from the returned results. Ambiguous, region-specific, live, remix, cover, or otherwise unavailable tracks may not match correctly. The transfer continues with the remaining tracks and reports the final results.
 
 **Lyrics aren't showing for a song.**
 Not every song has synced lyrics available from any provider. Try toggling different providers on/off in the popup — coverage varies per source.
