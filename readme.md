@@ -17,7 +17,7 @@
 Vivimusic Web is a browser extension that reskins **[music.youtube.com](https://music.youtube.com)** with animated Canvas-style backgrounds (like Apple Music/Spotify Canvas), word-synced lyrics, an audio equalizer, Sponsorblock skipping, Last.fm scrobbling, and a dark, glassy theme — without needing a separate desktop app or a Chrome Web Store install.
 
 This extension is **not published on the Chrome Web Store**. It's distributed as source from this repository and loaded manually as an "unpacked" extension. Follow the installation guide below — it takes about a minute.
-/n🔴This extension require good amount of ram like 1gb max and some graphics  for example if you have a littlebit gpu even windows intregated gpu thats also can run this just make sure that graphics acceleration is turn on in your browser its very important . 
+\n 🔴This extension require good amount of ram like 1gb max and some graphics  for example if you have a littlebit gpu even windows intregated gpu thats also can run this just make sure that graphics acceleration is turn on in your browser its very important . 
 
 ---
 
