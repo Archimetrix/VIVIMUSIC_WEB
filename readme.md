@@ -19,7 +19,7 @@ Vivimusic Web is a browser extension that reskins **[music.youtube.com](https://
 This extension is **not published on the Chrome Web Store**. It's distributed as source from this repository and loaded manually as an "unpacked" extension. Follow the installation guide below — it takes about a minute.
 
 
-🔴This extension require good amount of ram like 1gb max and some graphics  for example if you have a littlebit gpu even windows intregated gpu thats also can run this just make sure that graphics acceleration is turn on in your browser its very important . 
+**🔴This extension require good amount of ram like 1gb max and some graphics  for example if you have a littlebit gpu even windows intregated gpu thats also can run this just make sure that graphics acceleration is turn on in your browser its very important .**
 
 ---
 
