@@ -36,6 +36,13 @@ This extension is **not published on the Chrome Web Store**. It's distributed as
 </div>
 
 ---
+## 📥 Download
+<a href="https://github.com/Archimetrix/VIVIMUSIC_WEB/releases" target="_blank">
+    <img src="https://img.shields.io/badge/Download_ZIP-101010?style=for-the-badge&logo=github&logoColor=white" alt="Download ZIP" height="56">
+  </a>
+  
+ **Note:** Currently available for only chromium browsers like chrome ,brave , opera , edge ,vivaldi etc....please use the **Download ZIP** button above and follow the quick **Local Installation** guide below.
+---
 
 ## Table of Contents
 
