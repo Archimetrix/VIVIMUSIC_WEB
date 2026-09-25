@@ -1,0 +1,46 @@
+<!doctype html>
+<!--
+  VIVIMUSIC WEB — apple-canvas-player.html
+
+  Runs Apple Music's motion-artwork .m3u8 exactly the way
+  https://github.com/bharadwajpro/m3u8-player plays any public HLS stream:
+  plain `new Hls(); hls.loadSource(url); hls.attachMedia(video);`, no header
+  spoofing, no proxying. That bare approach was confirmed to work against
+  this exact CDN in an ordinary browser tab, which means Apple's CDN isn't
+  actually gating on Origin/Referer for this asset — the previous
+  declarativeNetRequest header rewrite and message-relay proxy loader in
+  content.js were solving a problem that didn't exist (and may have been
+  the actual cause of playback failing).
+
+  This page is loaded in an <iframe> from content.js, at
+  chrome-extension://<id>/src/apple-canvas-player.html — a real top-level
+  document with the extension's own origin, so any fetch/XHR hls.js makes
+  here gets a normal, unmodified request exactly like the working demo got,
+  rather than running inside music.youtube.com's page context.
+-->
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: transparent;
+      overflow: hidden;
+    }
+    #v {
+      width: 100%;
+      height: 100%;
+      display: block;
+      background: #000;
+    }
+  </style>
+</head>
+<body>
+  <video id="v" muted autoplay loop playsinline></video>
+  <script src="vendor/hls.min.js"></script>
+  <script src="apple-canvas-player.js"></script>
+</body>
+</html>

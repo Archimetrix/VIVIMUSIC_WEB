@@ -1,0 +1,11 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Spotify → YouTube Music</title><link rel="stylesheet" href="transfer.css"></head>
+<body><main>
+  <header><div><div class="eyebrow">VIVIMUSIC</div><h1>Spotify → YouTube Music</h1><p>Transfer Spotify playlists without sending your library to a third-party server.</p></div><button id="openYtm" class="ghost">Open YouTube Music</button></header>
+  <div class="warning"><b>⚠ Keep this transfer page open.</b><span>Do not switch tabs, close YouTube Music, or switch apps until the transfer finishes. Switching away can interrupt matching or playlist updates.</span></div><section class="cards"><div class="card"><div class="label">SPOTIFY</div><div id="spStatus">Checking…</div></div><div class="card"><div class="label">YOUTUBE MUSIC</div><div id="ytStatus">Not checked</div></div></section>
+  <section class="panel"><div class="panelHead"><h2>Choose music</h2><div><button id="reload" class="ghost">Refresh</button><button id="start" class="primary" disabled>Transfer selected</button></div></div>
+    <div id="sourceList" class="sources"><div class="empty">Connect Spotify and open YouTube Music first.</div></div>
+  </section>
+  <section id="progress" class="panel hidden"><div class="panelHead"><h2 id="progressTitle">Transfer</h2><span id="progressCount"></span></div><div class="bar"><i id="bar"></i></div><div id="log" class="log"></div></section>
+  <section id="results" class="panel hidden"><div class="panelHead"><h2>Results</h2><button id="closeResults" class="ghost">Done</button></div><div id="resultList"></div></section>
+</main><script src="transfer.js"></script></body></html>

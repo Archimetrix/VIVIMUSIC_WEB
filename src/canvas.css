@@ -1,0 +1,823 @@
+/* VIVIMUSIC ARTWORK — canvas.css */
+
+.vivi-canvas-slot {
+  position: relative !important;
+  overflow: hidden !important;
+  border-radius: var(--radius-art, 8px);
+}
+
+.vivi-canvas-slot > img:not(.vivi-canvas-media) {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.vivi-canvas-media {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  border-radius: inherit;
+  z-index: 2;
+  pointer-events: none;
+  animation: vivi-fadein 0.4s ease forwards;
+}
+
+.vivi-canvas-crossfade { animation: vivi-fadein 0.4s ease forwards !important; }
+.vivi-canvas-fadeout   { animation: vivi-fadeout 0.35s ease forwards !important; pointer-events: none; }
+
+@keyframes vivi-fadein  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes vivi-fadeout { from { opacity: 1; } to { opacity: 0; } }
+
+ytmusic-player-bar .vivi-canvas-slot,
+ytmusic-player-bar ytmusic-thumbnail.vivi-canvas-slot {
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+}
+
+#song-image .vivi-canvas-slot,
+ytmusic-player .vivi-canvas-slot {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vivi-canvas-media, .vivi-canvas-crossfade, .vivi-canvas-fadeout { animation: none !important; }
+  video.vivi-canvas-media { display: none; }
+}
+
+/* ── LYRICS PANEL */
+#vivi-lyrics-panel {
+  padding: 12px 4px 40px;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+/* Edge fade: while our lyrics panel is mounted inside YTM's native tab
+   scroller, mask the top/bottom of that scroller so lines softly fade
+   (rather than hard-cut) as they scroll in and out of view — a small
+   touch that reads as a lot more premium/polished. Because mask-image is
+   painted relative to the scroller's own box (not its scrolled content),
+   this stays pinned to the visible edges as lyrics scroll underneath it.
+   .vivi-fade-top / .vivi-fade-bottom are toggled from JS based on actual
+   scroll position, so an edge only fades when there's real content hidden
+   past it — the first/last line never sits permanently dimmed. */
+#tab-renderer.vivi-lyrics-edge-fade.vivi-fade-top.vivi-fade-bottom {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    black 90px,
+    black calc(100% - 100px),
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    black 90px,
+    black calc(100% - 100px),
+    transparent 100%
+  );
+}
+
+#tab-renderer.vivi-lyrics-edge-fade.vivi-fade-top:not(.vivi-fade-bottom) {
+  mask-image: linear-gradient(to bottom, transparent 0, black 90px);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, black 90px);
+}
+
+#tab-renderer.vivi-lyrics-edge-fade.vivi-fade-bottom:not(.vivi-fade-top) {
+  mask-image: linear-gradient(to bottom, black calc(100% - 100px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 100px), transparent 100%);
+}
+
+.vivi-lyrics-loading,
+.vivi-lyrics-empty {
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--text-secondary, rgba(255,255,255,0.7));
+  font-size: 14px;
+}
+
+.vivi-lyrics-video-blocked {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 24px 16px 40px;
+  text-align: center;
+  animation: vivi-fadein 0.4s ease forwards;
+}
+
+.vivi-lyrics-dancer {
+  width: min(220px, 60vw);
+  height: auto;
+  aspect-ratio: 9 / 16;
+  object-fit: contain;
+  filter: drop-shadow(0 12px 28px rgba(0, 0, 0, 0.35));
+  pointer-events: none;
+}
+
+.vivi-lyrics-video-blocked-caption {
+  margin-top: 6px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary, #fff);
+}
+
+.vivi-lyrics-video-blocked-sub {
+  font-size: 12px;
+  color: var(--text-secondary, rgba(255,255,255,0.6));
+  max-width: 280px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vivi-lyrics-dancer { display: none; }
+}
+
+.vivi-lyrics-list {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.vivi-lyrics-list.vivi-lyrics-align-center {
+  align-items: center;
+  text-align: center;
+}
+
+.vivi-lyrics-list.vivi-lyrics-align-right {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.vivi-lyrics-line {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--text-secondary, rgba(255,255,255,0.45));
+  filter: blur(0px);
+  opacity: 0.55;
+  transition: color 0.3s ease, opacity 0.3s ease, transform 0.3s ease, font-size 0.25s ease;
+  transform-origin: left center;
+  cursor: default;
+}
+
+.vivi-lyrics-list.vivi-lyrics-align-center .vivi-lyrics-line { transform-origin: center center; }
+.vivi-lyrics-list.vivi-lyrics-align-right .vivi-lyrics-line { transform-origin: right center; }
+
+.vivi-lyrics-line.vivi-lyrics-active {
+  color: var(--text-primary, #fff);
+  opacity: 1;
+  font-size: 26px;
+}
+
+.vivi-lyrics-line.vivi-lyrics-clickable {
+  cursor: pointer;
+}
+
+.vivi-lyrics-line.vivi-lyrics-clickable:hover {
+  opacity: 0.85;
+}
+
+.vivi-lyrics-word {
+  display: inline-block;
+  margin-right: 0.28em;
+  white-space: pre-wrap;
+  background-image: linear-gradient(
+    90deg,
+    var(--text-primary, #fff) 50%,
+    var(--text-secondary, rgba(255,255,255,0.45)) 50%
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  background-position: 100% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  transition: background-position 0.15s linear;
+}
+
+.vivi-lyrics-word:last-child {
+  margin-right: 0;
+}
+
+/* Words not yet reached in the currently active line start fully unfilled. */
+.vivi-lyrics-line.vivi-lyrics-active .vivi-lyrics-word {
+  background-position: 100% 0;
+}
+
+/* Fully-sung words are snapped to a complete fill (JS sets an inline
+   background-position/transition-duration on the active word itself to
+   animate the sweep in real time; this class is the resting end-state). */
+.vivi-lyrics-line.vivi-lyrics-active .vivi-lyrics-word-sung {
+  background-position: 0% 0;
+}
+
+/* Glow-up animation style: instead of the gradient sweep, words snap to
+   solid color and the currently-singing word pulses with a soft glow that
+   fades out over its spoken duration. */
+.vivi-lyrics-list.vivi-lyrics-anim-glow .vivi-lyrics-word {
+  background-image: none;
+  -webkit-text-fill-color: unset;
+  color: var(--text-secondary, rgba(255,255,255,0.45));
+  text-shadow: none;
+  transition: color 0.15s ease, text-shadow 0.15s ease;
+}
+
+/* Note: the active line's own color/opacity/font-size already come from
+   .vivi-lyrics-line.vivi-lyrics-active. Words deliberately stay dim by
+   default here — only the currently-sung word (via .word-glowing) and
+   already-sung words (via .word-sung) turn white, so word-synced lyrics
+   highlight word-by-word instead of lighting up the whole line at once. */
+.vivi-lyrics-list.vivi-lyrics-anim-glow .vivi-lyrics-word-sung {
+  color: var(--text-primary, #fff);
+  text-shadow: none;
+}
+
+.vivi-lyrics-list.vivi-lyrics-anim-glow .vivi-lyrics-word-glowing {
+  color: #fff;
+  text-shadow:
+    0 0 6px rgba(255, 255, 255, 0.85),
+    0 0 16px rgba(255, 255, 255, 0.55),
+    0 0 28px var(--accent-color, rgba(120, 180, 255, 0.6));
+  transition: color 0.05s ease, text-shadow 0.4s ease-out;
+}
+
+/* Word bounce animation style: the active line lights up as a whole (like
+   glow), and each word additionally pops with a quick spring-scale exactly
+   as it's sung. */
+.vivi-lyrics-list.vivi-lyrics-anim-bounce .vivi-lyrics-word {
+  background-image: none;
+  -webkit-text-fill-color: unset;
+  color: var(--text-secondary, rgba(255,255,255,0.45));
+  display: inline-block;
+  transform: scale(1);
+}
+
+/* Same note as the glow style above: words stay dim by default so only the
+   word currently bouncing (mid-sung) and words already sung are white. */
+.vivi-lyrics-list.vivi-lyrics-anim-bounce .vivi-lyrics-word-sung {
+  color: var(--text-primary, #fff);
+}
+
+@keyframes vivi-word-bounce {
+  0%   { transform: scale(1); }
+  45%  { transform: scale(1.24); }
+  100% { transform: scale(1); }
+}
+
+.vivi-lyrics-list.vivi-lyrics-anim-bounce .vivi-lyrics-word-bouncing {
+  color: var(--text-primary, #fff);
+  animation: vivi-word-bounce 0.32s cubic-bezier(.34, 1.56, .64, 1);
+}
+
+.vivi-lyrics-credit-row {
+  margin-top: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.vivi-lyrics-credit {
+  font-size: 11px;
+  opacity: 0.4;
+  text-align: center;
+}
+
+.vivi-offset-btn {
+  width: 20px;
+  height: 20px;
+  line-height: 18px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.25);
+  background: rgba(255,255,255,0.06);
+  color: var(--text-primary, #fff);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: center;
+}
+
+.vivi-offset-btn:hover {
+  background: rgba(255,255,255,0.16);
+}
+
+/* ── "i" button beside the Lyrics tab + its inline offset editor ── */
+.vivi-lyrics-info-wrap {
+  display: inline-flex !important;
+  flex: 0 0 auto !important;
+  align-self: center !important;
+  align-items: center !important;
+  vertical-align: middle;
+}
+
+.vivi-lyrics-info-btn {
+  all: unset;
+  box-sizing: border-box !important;
+  display: inline-flex !important;
+  flex: 0 0 auto !important;
+  align-self: center !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 14px !important;
+  height: 14px !important;
+  min-width: 14px !important;
+  max-width: 14px !important;
+  min-height: 14px !important;
+  max-height: 14px !important;
+  margin: 0 0 0 8px !important;
+  padding: 0 !important;
+  border-radius: 50% !important;
+  border: 1px solid rgba(255,255,255,0.35) !important;
+  background: rgba(255,255,255,0.08) !important;
+  color: var(--text-primary, #fff) !important;
+  font-size: 9px !important;
+  font-style: italic !important;
+  font-weight: 700 !important;
+  font-family: Georgia, 'Times New Roman', serif !important;
+  line-height: 1 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+  cursor: pointer !important;
+  opacity: 0.55;
+  vertical-align: middle;
+  transition: opacity 0.2s ease, background 0.2s ease;
+}
+
+.vivi-lyrics-info-btn:hover {
+  opacity: 1;
+  background: rgba(255,255,255,0.18) !important;
+}
+
+.vivi-lyrics-info-btn-active {
+  opacity: 1 !important;
+  background: rgba(255,255,255,0.28) !important;
+  border-color: rgba(255,255,255,0.55) !important;
+}
+
+/* Inline editor panel shown at the top of the lyrics list when the "i"
+   button is toggled on. Rendered as part of the normal panel content (not
+   a floating/fixed popup), so it's rebuilt along with everything else on
+   every track change and can never end up anchored to a stale button. */
+.vivi-offset-panel {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  margin: 0 0 20px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(15,12,10,0.92);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.14);
+  box-shadow: 0 10px 18px -10px rgba(0,0,0,0.55);
+  animation: vivi-fadein 0.15s ease forwards;
+}
+
+.vivi-offset-panel-title {
+  font-size: 12px;
+  opacity: 0.7;
+  margin-bottom: 8px;
+}
+
+.vivi-offset-panel-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.vivi-offset-panel-controls .vivi-offset-btn {
+  width: 24px;
+  height: 24px;
+  line-height: 22px;
+}
+
+.vivi-offset-save-btn {
+  margin-left: auto;
+  padding: 5px 14px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.25);
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.vivi-offset-save-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.vivi-offset-save-btn-dirty {
+  background: #ffffff;
+  color: #111 !important;
+  border-color: transparent;
+}
+
+.vivi-offset-save-btn-dirty:hover {
+  filter: brightness(0.95);
+}
+
+.vivi-offset-refetch-btn {
+  padding: 5px 14px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: transparent;
+  color: rgba(255,255,255,0.85);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.vivi-offset-refetch-btn:hover:not(:disabled) {
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255,255,255,0.3);
+}
+
+.vivi-offset-refetch-btn:disabled,
+.vivi-offset-refetch-btn-loading {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.vivi-offset-input {
+  width: 62px;
+  text-align: center;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 6px;
+  color: var(--text-primary, #fff);
+  padding: 3px 4px;
+}
+
+.vivi-offset-input:focus {
+  outline: none;
+  border-color: rgba(255,255,255,0.5);
+}
+
+.vivi-offset-unit {
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+
+/* Spotify Canvas source marker */
+.vivi-canvas-media.vivi-spotify-canvas {
+  filter: none;
+}
+
+/* ── SPOTIFY CANVAS: TRUE 9:16 COMPACT PLAYER ─────────────────────────────
+   Spotify Canvas is portrait. The dedicated player is always a real 9:16 box,
+   independent of YouTube Music's square artwork container.
+*/
+:root {
+  --vivi-canvas-frame-color: rgba(255, 255, 255, 0.92);
+  --vivi-canvas-frame-width: 2px;
+  --vivi-canvas-frame-glow: rgba(0, 0, 0, 0.42);
+  --vivi-canvas-fixed-ar: 0.5625;
+}
+
+/* The Canvas player is position:fixed from JS. The host artwork is only its
+   reference rectangle, so host overflow/grid sizing can never crop it. */
+
+/* Hide ALL native content in the main artwork window while the independent
+   Canvas player is active. The Canvas itself lives directly under <body>, so it
+   is unaffected by this rule. */
+ytmusic-player #song-media-window.vivi-canvas-main-active > .vivi-canvas-native-hidden,
+ytmusic-player #song-media-window.vivi-canvas-main-active .vivi-canvas-native-hidden {
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Main player: compact and mathematically 9:16. Hidden (display:none) by
+   default — see the .vivi-canvas-player[data-vivi-visible="1"] override
+   below. Do NOT force display:block here: this element must be genuinely
+   removed from rendering whenever the app isn't showing the full player
+   page, not merely faded to invisible, or a stale/mispositioned box can
+   still show through on Home/Library/Explore. */
+.vivi-canvas-player {
+  position: fixed !important;
+  width: var(--vivi-player-width, 230px) !important;
+  height: var(--vivi-player-height, 409px) !important;
+  aspect-ratio: 9 / 16 !important;
+  transform: translateX(-50%) !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  isolation: isolate !important;
+  background: transparent !important;
+  border-radius: 18px !important;
+  box-shadow: 0 0 0 var(--vivi-canvas-frame-width) var(--vivi-canvas-frame-color),
+              0 12px 32px var(--vivi-canvas-frame-glow) !important;
+  z-index: 9999 !important;
+  display: none !important;
+  /* This is a purely decorative overlay (no click handlers are ever bound
+     to it), but it sits at z-index:9999 as a direct child of <body> — well
+     above YouTube's native dialogs, which typically sit around z-index:103.
+     Without this, the canvas box silently swallows clicks meant for any
+     dialog/menu content that happens to render underneath its rectangle
+     (e.g. "Save to playlist", "Share"). It stays fully visible; only its
+     ability to intercept the pointer is removed. */
+  pointer-events: none !important;
+}
+
+/* While a native dialog, dropdown menu, or the search-suggestions panel is
+   open (tracked in content.js via the "opened" attribute they all share),
+   drop the Canvas well below it so those panels are actually visible
+   instead of being visually covered by the always-on-top video box. */
+.vivi-canvas-player.vivi-canvas-below-overlay {
+  z-index: 50 !important;
+}
+
+/* Belt-and-braces version of the same fix: rather than relying entirely on
+   detecting "is some dialog currently open" in JS (different native
+   dialogs/menus use different tag names and don't all reflect it the same
+   way), the specific elements YouTube Music uses to render floating UI —
+   the search-suggestions dropdown, "Save to playlist"/"Share"/etc.
+   dialogs, and popup menus — are simply always given a z-index higher
+   than the Canvas's own 9999. These elements are already positioned
+   (fixed/absolute) by YouTube Music itself only while actually shown as an
+   overlay, so bumping their z-index has no effect the rest of the time.
+
+   Search suggestions specifically need TWO things elevated, not just the
+   dropdown itself: <ytmusic-search-box> lives inside <ytmusic-nav-bar>,
+   and if the header forms its own (lower) stacking context — which sticky
+   headers with a z-index of their own generally do — then no z-index on
+   a descendant, however large, can ever escape it to beat a
+   position:fixed sibling of <body> like the Canvas. So the header itself
+   is included here too. */
+tp-yt-paper-dialog,
+tp-yt-iron-dropdown,
+ytmusic-popup-container,
+ytmusic-multi-select-menu,
+ytmusic-add-to-playlist-renderer,
+ytmusic-app-layer,
+ytmusic-nav-bar,
+ytmusic-search-box[opened],
+ytmusic-search-box[opened] .search-container,
+ytmusic-search-box #suggestion-list {
+  z-index: 2147483000 !important;
+}
+
+/* Frosted-glass backing for the search-suggestions dropdown. Its native
+   background is a fairly transparent dark overlay, which (now that it's
+   guaranteed to render above the Canvas — see above) let the video show
+   through distractingly behind the suggestion text. A blurred, more opaque
+   panel makes the list easy to read regardless of what's playing. */
+ytmusic-search-box #suggestion-list {
+  background: rgba(15,12,10,0.88) !important;
+  backdrop-filter: blur(24px) saturate(1.3) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(1.3) !important;
+  border-radius: 12px;
+}
+
+/* Same "always above the Canvas" treatment for the bottom player bar. The
+   Canvas is a position:fixed child of <body> at z-index 9999, so whenever its
+   box reaches down far enough it paints over the seek/progress bar. It's
+   pointer-events:none (dragging still works), but the track and knob were
+   visually covered. Rather than shrinking the Canvas to dodge the bar, the bar
+   — which is a direct child of ytmusic-app-layout and so can actually escape to
+   the top — is simply given a higher z-index, exactly like the dialogs and
+   search suggestions above. The player bar sits at the very bottom of the
+   viewport, so this costs the Canvas nothing visually. */
+ytmusic-player-bar,
+#player-bar-background,
+ytmusic-player-bar #progress-bar,
+ytmusic-player-bar #hover-time-info {
+  z-index: 2147483000 !important;
+}
+
+.vivi-canvas-player::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.16);
+  pointer-events: none;
+  z-index: 4;
+}
+
+/* Canvas media fills an exactly matching 9:16 frame, so no crop occurs.
+   inset is deliberately -1px (not 0): the parent's box-shadow ring and this
+   media element are painted as separate compositing layers, and on
+   non-integer display scaling (125%/150% Windows scaling, fractional macOS
+   scaling, etc.) their rounded edges can snap to different device pixels,
+   leaving a 1px seam where the page background shows through (and/or a
+   sliver of raw video bleeding past the intended crop). Overshooting by 1px
+   and relying on the parent's overflow:hidden + border-radius to clip it
+   back down guarantees full coverage regardless of subpixel rounding. */
+.vivi-canvas-player-media {
+  position: absolute !important;
+  inset: -1px !important;
+  display: block !important;
+  width: calc(100% + 2px) !important;
+  height: calc(100% + 2px) !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  object-fit: cover !important;
+  object-position: center center !important;
+  border-radius: inherit !important;
+  background: #000 !important;
+  z-index: 2 !important;
+  pointer-events: none !important;
+  transition: opacity 0.35s ease !important;
+}
+
+.vivi-canvas-player-crossfade { animation: vivi-player-fadein 0.35s ease forwards !important; }
+.vivi-canvas-player-fadeout { animation: vivi-player-fadeout 0.35s ease forwards !important; }
+
+@keyframes vivi-player-fadein  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes vivi-player-fadeout { from { opacity: 1; } to { opacity: 0; } }
+
+/* Player-bar thumbnail keeps its original compact overlay behavior. */
+.vivi-canvas-slot {
+  position: relative !important;
+  overflow: hidden !important;
+  border-radius: inherit !important;
+}
+
+.vivi-canvas-slot > img:not(.vivi-canvas-media) {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.vivi-canvas-media {
+  position: absolute !important;
+  inset: -1px !important;
+  width: calc(100% + 2px) !important;
+  height: calc(100% + 2px) !important;
+  object-fit: cover !important;
+  object-position: center !important;
+  border-radius: inherit;
+  z-index: 2;
+  pointer-events: none;
+  animation: vivi-fadein 0.4s ease forwards;
+}
+
+.vivi-canvas-crossfade { animation: vivi-fadein 0.4s ease forwards !important; }
+.vivi-canvas-fadeout   { animation: vivi-fadeout 0.35s ease forwards !important; pointer-events: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .vivi-canvas-player-media,
+  .vivi-canvas-player-crossfade,
+  .vivi-canvas-player-fadeout,
+  .vivi-canvas-media,
+  .vivi-canvas-crossfade,
+  .vivi-canvas-fadeout { animation: none !important; transition: none !important; }
+}
+
+/* Player bar artwork can remain subtly larger while a Canvas is active. */
+html.vivi-canvas-large ytmusic-player-bar .thumbnail-image-wrapper.ytmusic-player-bar,
+html.vivi-canvas-large ytmusic-player-bar ytmusic-thumbnail,
+html.vivi-canvas-large ytmusic-player-bar .image.ytmusic-player-bar {
+  transform: scale(1.12);
+  transform-origin: center left;
+  transition: transform 0.35s cubic-bezier(0.3, 0.6, 0.5, 1);
+  z-index: 3;
+  position: relative;
+}
+
+/* Suppress YT Music's native top gradient while our independent player is visible. */
+html.vivi-canvas-large ytmusic-player[player-ui-state] #song-media-window {
+  background: none !important;
+}
+
+@media (max-width: 900px) {
+  .vivi-canvas-player {
+    border-radius: 16px !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.vivi-canvas-large ytmusic-player-bar .thumbnail-image-wrapper.ytmusic-player-bar,
+  html.vivi-canvas-large ytmusic-player-bar ytmusic-thumbnail,
+  html.vivi-canvas-large ytmusic-player-bar .image.ytmusic-player-bar {
+    transform: none;
+  }
+}
+
+/* Bottom player bar remains visible; Canvas positioning accounts for its height. */
+
+/* theme.css's #layout[player-page-open] #guide-wrapper / #nav-bar-background
+   rules set `background` but not `backdrop-filter`, so once the player page is
+   open the left sidebar and header background fall back to solid/opaque
+   instead of the glass-blur look used everywhere else on the page. Also,
+   theme.css only sets #mini-guide-background to opacity:0 while
+   `content-scrolled` or `player-page-open`, so scrolling even a little on a
+   normal (non-Canvas) song snaps the sidebar back to solid black. Apply the
+   blur/transparent look unconditionally, on every page/state, not just while
+   a Canvas is playing, so the sidebar and header always match the glass look.
+   This must only apply while the user has the theme turned ON — it's gated
+   behind html.vivi-theme-on so that disabling the theme fully restores
+   YouTube Music's native (non-tinted) header/sidebar instead of leaving them
+   glassy and colored by whatever artwork happens to be behind them. */
+html.vivi-theme-on #layout[player-page-open] #guide-wrapper,
+html.vivi-theme-on #guide-wrapper,
+html.vivi-theme-on #layout[player-page-open] #nav-bar-background,
+html.vivi-theme-on #nav-bar-background,
+html.vivi-theme-on #mini-guide-background {
+  background: var(--ui-color, rgba(0, 0, 0, 0.35)) !important;
+  backdrop-filter: blur(var(--ui-blur, 10px)) !important;
+  -webkit-backdrop-filter: blur(var(--ui-blur, 10px)) !important;
+  opacity: 1 !important;
+}
+
+
+/* Dedicated Canvas mode: hide native artwork content while preserving
+   #song-media-window itself as the geometry anchor for the independent player. */
+html.vivi-canvas-large ytmusic-player #song-media-window.vivi-canvas-main-active {
+  background: transparent !important;
+  background-image: none !important;
+  overflow: visible !important;
+}
+html.vivi-canvas-large ytmusic-player #song-image,
+html.vivi-canvas-large ytmusic-player #song-image img,
+html.vivi-canvas-large ytmusic-player .ytmusic-player-thumbnail,
+html.vivi-canvas-large ytmusic-player ytmusic-thumbnail.ytmusic-player {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Reveal the fixed Canvas only through its explicit ready/visible state.
+   Do not key visibility directly off the page-level Canvas class: during
+   mini-player -> full-player transitions that class may toggle while YT Music
+   is still animating its native thumbnail, which previously caused a rapid
+   thumbnail <-> Canvas blink.
+   display is redeclared here (not just visibility/opacity) — see the
+   display:none default in the main .vivi-canvas-player block above, which
+   this must explicitly re-enable to ever actually show the player. */
+.vivi-canvas-player {
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+.vivi-canvas-player[data-vivi-visible="1"] {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* Do not enlarge/animate the bottom player-bar thumbnail in Canvas mode. */
+html.vivi-canvas-large ytmusic-player-bar .thumbnail-image-wrapper.ytmusic-player-bar,
+html.vivi-canvas-large ytmusic-player-bar ytmusic-thumbnail,
+html.vivi-canvas-large ytmusic-player-bar .image.ytmusic-player-bar {
+  transform: none !important;
+}
+
+/* Apple Music-style artwork overlay: keep the native YouTube Music thumbnail
+   in the DOM and place the animated artwork above it as a sibling.
+   inset is -1px (not 0) for the same reason as the main player's media rule
+   above: this overlay and the native thumbnail underneath it are separate
+   compositing layers, and exact inset:0 can leave a 1px seam on non-integer
+   display scaling. Overshooting slightly and letting the parent's own
+   overflow/border-radius (inherited from the native thumbnail's rounded
+   corner) clip it back down removes the seam. */
+.vivi-canvas-media[data-vivi-apple-overlay="1"] {
+  position: absolute !important;
+  inset: -1px !important;
+  width: calc(100% + 2px) !important;
+  height: calc(100% + 2px) !important;
+  object-fit: cover !important;
+  object-position: center !important;
+  border-radius: inherit !important;
+  z-index: 2 !important;
+  pointer-events: none !important;
+}
+
+.vivi-canvas-media[data-vivi-apple-overlay="1"] + * { position: relative; }
+
+/* Apple Music artwork overlay: do not crossfade/animate the overlay itself.
+   The native YouTube Music thumbnail remains underneath, so any animation on
+   this layer can produce a visible thumbnail flash during YT Music DOM updates. */
+.vivi-canvas-media[data-vivi-apple-overlay="1"] {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* ── Custom logo sizing ──
+   The stock YT Music logo is an SVG rendered at a fixed 24px height; our
+   replacement is a raster PNG with a different intrinsic aspect ratio, so
+   keep it constrained to the same box and let it scale proportionally. */
+ytmusic-logo img,
+ytmusic-logo picture {
+  height: 24px;
+  width: auto;
+  max-width: none;
+  object-fit: contain;
+}

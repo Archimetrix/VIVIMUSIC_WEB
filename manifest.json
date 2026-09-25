@@ -1,0 +1,107 @@
+{
+  "manifest_version": 3,
+  "name": "Vivimusic Web",
+  "version": "8.2.1",
+  "description": "Vivimusic Web — Apple Music artwork, Spotify Canvas, synced lyrics, Last.fm scrobbling and Spotify → YouTube Music playlist transfer using local Spotify Web GraphQL and YouTube Music page session.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAodVgf320I+Nl4y2brFxWRyRRBW1XlSpf/Nr0uZvQk3H931IWS/lKNcCzL+x7SD+hEo6L3AbN3yo0jvwp828vPxPb7j0TN9VShKkCx8xub3b6u7umdbjqRw7TKF7L5CMsaEVMjtrCAtROQCjos4DL38So93jwbGhKja2vFPknLLRJQxoQ6y+srZx7HBRswidCcinkNrLrwATnrsnsvHijg6vDsnvQP+iRtPQ18H+QlMHGIzQY6FivqnCijLf2baRi/tWMnulTkWlZXURkKyP1L+wGdU19OZ66e79brteGKjOEaq1Sq6+ftPNLcQHfuJ9/EBqP5ZlQBsSaOlVAsQJIKwIDAQAB",
+  "permissions": [
+    "storage",
+    "unlimitedStorage",
+    "activeTab",
+    "tabs",
+    "alarms",
+    "cookies",
+    "declarativeNetRequestWithHostAccess",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://music.youtube.com/*",
+    "https://lyrics-api.boidu.dev/*",
+    "https://unison.boidu.dev/*",
+    "https://lrclib.net/*",
+    "https://apic-desktop.musixmatch.com/*",
+    "https://apic.musixmatch.com/*",
+    "https://www.musixmatch.com/*",
+    "https://api.github.com/*",
+    "https://github.com/*",
+    "https://ws.audioscrobbler.com/*",
+    "https://open.spotify.com/*",
+    "https://api.spotify.com/*",
+    "https://api-partner.spotify.com/*",
+    "https://spclient.wg.spotify.com/*",
+    "https://apresolve.spotify.com/*",
+    "https://clienttoken.spotify.com/*",
+    "https://canvaz.scdn.co/*",
+    "https://code.thetadev.de/*",
+    "https://song.link/*",
+    "https://sponsor.ajay.app/*",
+    "https://*.mzstatic.com/*",
+    "https://*.apple.com/*",
+    "https://*.cdn-apple.com/*",
+    "https://*.itunes.apple.com/*",
+    "https://*.aaplimg.com/*"
+  ],
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://music.youtube.com/*"
+      ],
+      "js": [
+        "src/gate.js",
+        "src/loader.js",
+        "src/ytm-transfer.js"
+      ],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://music.youtube.com/*"
+      ],
+      "js": [
+        "src/lyrics.js",
+        "src/lyrics-ui.js",
+        "src/sponsorblock.js",
+        "src/kawarp.js",
+        "src/kawarp-bg.js",
+        "src/equalizer.js",
+        "src/vendor/hls.min.js",
+        "src/content.js"
+      ],
+      "css": [
+        "src/canvas.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "src/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "src/theme.css",
+        "icons/icon128.png",
+        "icons/lyrics-dancer.webm",
+        "icons/custom-logo-full.png",
+        "icons/custom-logo-icon.png",
+        "src/apple-canvas-player.html"
+      ],
+      "matches": [
+        "https://music.youtube.com/*"
+      ]
+    }
+  ]
+}
