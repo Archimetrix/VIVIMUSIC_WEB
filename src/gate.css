@@ -1,0 +1,41 @@
+#vivi-star-gate, #vivi-star-gate * { box-sizing: border-box; }
+    #vivi-star-gate { isolation: isolate; }
+    #vivi-star-gate .gate-stage { position: relative; z-index: 0; width: min(100%, 490px); margin: auto; animation: gate-arrive .5s cubic-bezier(.2,.75,.2,1) both; }
+    #vivi-star-gate .gate-stage::before, #vivi-star-gate .gate-stage::after { content: ''; position: absolute; z-index: -1; width: 220px; height: 220px; border-radius: 50%; filter: blur(56px); opacity: .2; pointer-events: none; animation: gate-float 9s ease-in-out infinite alternate; }
+    #vivi-star-gate .gate-stage::before { top: -72px; right: -46px; background: #7465ff; }
+    #vivi-star-gate .gate-stage::after { left: -60px; bottom: -60px; background: #20c993; animation-delay: -4s; }
+    #vivi-star-gate .gate-shell { overflow: hidden; border: 1px solid rgba(255,255,255,.11); border-radius: 22px; background: linear-gradient(145deg, rgba(27,27,40,.94), rgba(14,15,23,.97)); box-shadow: 0 28px 100px rgba(0,0,0,.55), inset 0 1px rgba(255,255,255,.08); backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px); }
+    #vivi-star-gate .gate-brand { display: flex; align-items: center; gap: 11px; padding: 19px 22px; border-bottom: 1px solid rgba(255,255,255,.07); }
+    #vivi-star-gate .gate-brand img { width: 39px; height: 39px; border-radius: 11px; box-shadow: 0 5px 18px rgba(111,100,255,.3); }
+    #vivi-star-gate .gate-brand-name { font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+    #vivi-star-gate .gate-brand-tagline { margin-top: 3px; color: #9a99ac; font-size: 10px; }
+    #vivi-star-gate .gate-body { padding: 24px 25px 22px; }
+    #vivi-star-gate .gate-kicker { color: #aaa0ff; font-size: 9px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+    #vivi-star-gate .gate-title { margin: 8px 0 8px; color: #fff; font-size: clamp(23px, 5vw, 29px); line-height: 1.12; letter-spacing: -.035em; font-weight: 760; }
+    #vivi-star-gate .gate-description { margin: 0; color: #c0bfcc; font-size: 13px; line-height: 1.65; }
+    #vivi-star-gate .gate-link { color: #bdabff; text-decoration: underline; text-decoration-color: rgba(189,171,255,.45); text-underline-offset: 3px; }
+    #vivi-star-gate .gate-link:hover { color: #fff; }
+    #vivi-star-gate .gate-steps { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; margin: 18px 0; }
+    #vivi-star-gate .gate-step { min-height: 66px; padding: 10px; border: 1px solid rgba(255,255,255,.075); border-radius: 11px; background: rgba(255,255,255,.035); }
+    #vivi-star-gate .gate-step-number { display: block; margin-bottom: 5px; color: #8f85ff; font-size: 9px; font-weight: 800; letter-spacing: .08em; }
+    #vivi-star-gate .gate-step-label { color: #e8e7ef; font-size: 10px; line-height: 1.35; font-weight: 600; }
+    #vivi-star-gate .gate-trust { display: flex; gap: 10px; align-items: flex-start; margin: 15px 0 18px; padding: 12px; border: 1px solid rgba(104,212,174,.16); border-radius: 12px; background: rgba(27,173,125,.065); color: #b9c9c5; font-size: 10px; line-height: 1.55; }
+    #vivi-star-gate .gate-trust svg { flex: none; width: 17px; height: 17px; color: #70ddb2; }
+    #vivi-star-gate .gate-actions { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; }
+    #vivi-star-gate .gate-button { min-height: 42px; padding: 0 17px; border: 1px solid rgba(255,255,255,.16); border-radius: 11px; color: #fff; background: linear-gradient(120deg,#7162ef,#9162e8); box-shadow: 0 7px 20px -10px rgba(131,103,255,.8), inset 0 1px rgba(255,255,255,.22); font: 700 12px/1 system-ui,sans-serif; cursor: pointer; transition: transform .16s, filter .16s, box-shadow .16s; }
+    #vivi-star-gate .gate-button:hover { transform: translateY(-1px); filter: brightness(1.08); box-shadow: 0 10px 25px -10px rgba(131,103,255,.9); }
+    #vivi-star-gate .gate-button.secondary { color: #d9d8e4; background: rgba(255,255,255,.055); box-shadow: none; text-decoration: none; display: inline-flex; align-items: center; }
+    #vivi-star-gate .gate-status { min-height: 16px; margin-top: 12px; color: #a7a6b5; font-size: 10px; }
+    #vivi-star-gate .gate-footer { padding: 0 25px 18px; color: #777687; text-align: center; font-size: 9px; }
+    #vivi-star-gate .gate-code { display: flex; align-items: center; gap: 9px; margin: 17px 0 12px; }
+    #vivi-star-gate .gate-code-value { flex: 1; padding: 14px 10px; border: 1px solid rgba(159,145,255,.24); border-radius: 12px; background: rgba(111,97,221,.1); color: #fff; text-align: center; font: 750 25px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .17em; }
+    #vivi-star-gate .gate-copy { width: 43px; height: 43px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.13); border-radius: 11px; color: #e4e2ee; background: rgba(255,255,255,.06); cursor: pointer; }
+    #vivi-star-gate .gate-copy:hover { border-color: rgba(163,148,255,.5); background: rgba(126,109,255,.14); }
+    #vivi-star-gate .gate-wait { display: flex; align-items: center; gap: 8px; margin-top: 14px; color: #a7a6b5; font-size: 11px; }
+    #vivi-star-gate .gate-spinner { width: 13px; height: 13px; border: 2px solid rgba(255,255,255,.2); border-top-color: #9e91ff; border-radius: 50%; animation: gate-spin .8s linear infinite; }
+    @keyframes gate-arrive { from { opacity: 0; transform: translateY(12px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
+    @keyframes gate-float { to { transform: translate3d(20px,-12px,0) scale(1.12); opacity: .3; } }
+    @keyframes gate-spin { to { transform: rotate(360deg); } }
+    @media(max-width:520px) { #vivi-star-gate { padding: 16px 12px; } #vivi-star-gate .gate-body { padding: 20px 17px 18px; } #vivi-star-gate .gate-brand { padding: 15px 17px; } #vivi-star-gate .gate-footer { padding: 0 17px 16px; } }
+    @media(max-width:360px) { #vivi-star-gate .gate-steps { grid-template-columns: 1fr; } #vivi-star-gate .gate-step { min-height: 0; display: flex; gap: 9px; align-items: center; } #vivi-star-gate .gate-step-number { margin: 0; } }
+    @media(prefers-reduced-motion:reduce) { #vivi-star-gate *, #vivi-star-gate *::before, #vivi-star-gate *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }

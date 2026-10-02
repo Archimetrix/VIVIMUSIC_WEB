@@ -51,6 +51,7 @@
       position: relative;
     }
 
+
     body::-webkit-scrollbar { display: none; width: 0; height: 0; }
     body { scrollbar-width: none; }
 
@@ -99,6 +100,12 @@
       margin-top: 3px;
       letter-spacing: 0.01em;
     }
+
+    .announcement-button { position: relative; width: 34px; height: 34px; flex: none; margin-left: auto; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 11px; color: #c8c7d6; background: rgba(255,255,255,.045); cursor: pointer; transition: .18s ease; }
+    .announcement-button:hover, .announcement-button:focus-visible { color: #fff; border-color: rgba(149,133,255,.55); background: rgba(149,133,255,.14); box-shadow: 0 5px 15px -9px #9585ff; }
+    .announcement-button svg { width: 17px; height: 17px; }
+    .announcement-badge { position: absolute; top: -5px; right: -5px; min-width: 16px; height: 16px; padding: 0 4px; display: grid; place-items: center; border: 2px solid #171720; border-radius: 99px; background: #ff4f83; color: white; font: 700 9px/1 system-ui,sans-serif; }
+    .announcement-badge[hidden] { display: none; }
 
     /* Sections */
     .section {
@@ -281,12 +288,7 @@
       font-size: 11px; padding: 3px 6px; max-width: 150px;
     }
 
-    /* All our dropdowns (lyrics alignment/animation, canvas priority,
-       provider priority) share this so the open option list is dark and
-       readable instead of falling back to the browser's default white
-       popup with low-contrast gray text. Chromium/Edge honor
-       background-color/color on <option>, so this fixes the open list;
-       -moz-* colors are for Firefox's equivalent. */
+    
     select,
     .priority-select,
     #canvasPrioritySelect,
@@ -843,6 +845,142 @@
       transition: filter .15s;
     }
     .brave-done-btn:hover { filter: brightness(1.08); }
+    /* Home screen with focused, independently scrollable feature panels. */
+    html, body { width: 460px; height: 600px; max-height: 600px; overflow: hidden; }
+    body { display: flex; flex-direction: column; overflow: hidden; padding: 0 14px 10px; }
+    .header { padding: 16px 2px 14px; }
+    .header::after { left: 2px; right: 2px; }
+    .header, .footer { flex: none; }
+    .view-home, .view-settings { flex: 1 1 auto; min-height: 0; max-height: none; overflow-x: hidden; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(174,167,216,.3) transparent; }
+    .view-home::-webkit-scrollbar, .view-settings::-webkit-scrollbar { width: 7px; }
+    .view-home::-webkit-scrollbar-track, .view-settings::-webkit-scrollbar-track { background: transparent; }
+    .view-home::-webkit-scrollbar-thumb, .view-settings::-webkit-scrollbar-thumb { background: rgba(174,167,216,.27); border: 2px solid transparent; background-clip: padding-box; border-radius: 8px; }
+    .view-home::-webkit-scrollbar-thumb:hover, .view-settings::-webkit-scrollbar-thumb:hover { background: rgba(174,167,216,.48); background-clip: padding-box; }
+    .view-home { scrollbar-width: none; }
+    .view-home::-webkit-scrollbar { display: none; width: 0; }
+    .home-intro { padding: 12px 2px 14px; }
+    .home-intro h2 { font-size: 18px; letter-spacing: -.025em; font-weight: 750; }
+    .home-intro p { margin-top: 5px; color: var(--text-2); font-size: 11px; }
+    .home-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; padding-bottom: 12px; }
+    .home-card { --card-accent: #9585ff; position: relative; isolation: isolate; overflow: hidden; min-height: 94px; text-align: left; padding: 13px; border-radius: 14px; border: 1px solid color-mix(in srgb, var(--card-accent), transparent 74%); background: radial-gradient(ellipse at 100% 0%, color-mix(in srgb, var(--card-accent), transparent 84%), transparent 58%), linear-gradient(145deg, rgba(31,31,42,.79), rgba(19,19,27,.9)); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); color: var(--text-0); cursor: pointer; box-shadow: inset 0 1px rgba(255,255,255,.075), 0 8px 20px -16px color-mix(in srgb, var(--card-accent), transparent 50%); transition: border-color .2s, transform .2s, box-shadow .2s, background .2s; }
+    .home-card:hover, .home-card:focus-visible { border-color: color-mix(in srgb, var(--card-accent), transparent 38%); background: radial-gradient(ellipse at 100% 0%, color-mix(in srgb, var(--card-accent), transparent 73%), transparent 62%), linear-gradient(145deg, rgba(37,37,50,.92), rgba(20,20,29,.96)); box-shadow: inset 0 1px rgba(255,255,255,.11), 0 10px 26px -14px color-mix(in srgb, var(--card-accent), transparent 36%); transform: translateY(-2px); }
+    .home-card:active { transform: translateY(0); }
+    .home-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .home-card-title { font-size: 12px; font-weight: 650; }
+    .home-card-icon { position: relative; width: 42px; height: 42px; flex: none; display: grid; place-items: center; border-radius: 12px; background: color-mix(in srgb, var(--card-accent), transparent 87%); box-shadow: inset 0 1px rgba(255,255,255,.09); }
+    .home-card-icon img { position: absolute; inset: 4px; width: 34px; height: 34px; object-fit: contain; transition: none; }
+    .home-card-icon .card-icon-animated { opacity: 0; }
+    .home-card.is-animated .card-icon-static { opacity: 0; transform: scale(.9); }
+    .home-card.is-animated .card-icon-animated { opacity: 1; transform: scale(1.08); }
+    .home-card-description { display: block; margin-top: 8px; color: #a3a2b1; font-size: 10px; line-height: 1.35; }
+    .home-card[data-feature="apple-artwork"] { --card-accent: #ff3b63; }
+    .home-card[data-feature="spotify-canvas"] { --card-accent: #39d47a; }
+    .home-card[data-feature="equalizer"] { --card-accent: #ff805c; }
+    .home-card[data-feature="lyrics"] { --card-accent: #f24b8b; }
+    .home-card[data-feature="appearance"] { --card-accent: #bd82ff; }
+    .home-card[data-feature="artwork-cache"] { --card-accent: #51b5ff; }
+    .home-card[data-feature="lastfm"] { --card-accent: #ff405b; }
+    .home-card[data-feature="updates"] { --card-accent: #5ed6bd; }
+    .home-card[data-feature="updates"] .home-card-icon img { filter: brightness(0) invert(1); }
+    .home-card[data-feature="spotify-canvas"] .home-card-icon img { inset: auto; left: 50%; top: 50%; width: 54px; height: 54px; max-width: none; transform: translate(-50%, -50%); }
+    .home-card[data-feature="spotify-canvas"].is-animated .card-icon-animated { transform: translate(-50%, -50%) scale(1.08); }
+    .home-card-arrow { color: #777587; font-size: 13px; }
+    .home-support { margin: 0 1px 7px; padding: 8px 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; border: 1px solid rgba(255,255,255,.06); border-radius: 12px; background: linear-gradient(100deg, rgba(255,255,255,.025), rgba(255,255,255,.045), rgba(255,255,255,.025)); }
+    .home-support-copy { color: #9b9aaa; font-size: 9px; white-space: nowrap; }
+    .home-support-actions { display: flex; align-items: center; gap: 6px; }
+    .support-pill { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 27px; padding: 0 9px; border: 1px solid rgba(255,255,255,.1); border-radius: 999px; color: #d8d7e1; background: rgba(255,255,255,.055); font: 600 9px/1 system-ui, sans-serif; text-decoration: none; white-space: nowrap; transition: transform .18s, background .18s, border-color .18s, box-shadow .18s; }
+    .support-pill svg { width: 12px; height: 12px; flex: none; }
+    .support-pill:hover, .support-pill:focus-visible { color: #fff; transform: translateY(-2px); background: rgba(130,111,255,.17); border-color: rgba(160,144,255,.38); box-shadow: 0 5px 14px -9px rgba(156,138,255,.8); }
+    .support-pill.coffee:hover, .support-pill.coffee:focus-visible { background: rgba(255,180,74,.14); border-color: rgba(255,194,105,.4); box-shadow: 0 5px 14px -9px rgba(255,183,78,.8); }
+    .support-pill .bmc-mark { color: #171717; background: #ffdd00; width: 15px; height: 15px; padding: 2px; border-radius: 4px; }
+    @media (prefers-reduced-motion: reduce) { .support-pill { transition: none; } }
+    .panel-nav { display: flex; align-items: center; gap: 12px; padding: 8px 0 13px; }
+    .back-btn { width: 32px; height: 32px; flex: none; border: 1px solid var(--line); border-radius: 9px; background: rgba(255,255,255,.045); color: var(--text-1); font-size: 17px; cursor: pointer; }
+    .back-btn:hover { background: var(--accent-soft); color: white; border-color: var(--accent-border); }
+    .panel-heading { font-size: 16px; font-weight: 700; letter-spacing: -.015em; }
+    .panel-caption { margin-top: 2px; font-size: 10px; color: var(--text-2); }
+    .settings-content { padding-bottom: 14px; }
+    .panel-icon { position: relative; width: 42px; height: 42px; flex: none; overflow: hidden; display: grid; place-items: center; border-radius: 12px; background: color-mix(in srgb, var(--panel-accent), transparent 86%); border: 1px solid color-mix(in srgb, var(--panel-accent), transparent 76%); box-shadow: inset 0 1px rgba(255,255,255,.1), 0 6px 18px -12px var(--panel-accent); }
+    .panel-icon img { width: 34px; height: 34px; object-fit: contain; }
+    .panel-icon[data-feature="updates"] img { filter: brightness(0) invert(1); }
+    .view-settings[data-feature="apple-artwork"] { --panel-accent: #ff3b63; }
+    .view-settings[data-feature="spotify-canvas"] { --panel-accent: #39d47a; }
+    .view-settings[data-feature="equalizer"] { --panel-accent: #ff805c; }
+    .view-settings[data-feature="lyrics"] { --panel-accent: #f24b8b; }
+    .view-settings[data-feature="appearance"] { --panel-accent: #bd82ff; }
+    .view-settings[data-feature="artwork-cache"] { --panel-accent: #51b5ff; }
+    .view-settings[data-feature="lastfm"] { --panel-accent: #ff405b; }
+    .view-settings[data-feature="updates"] { --panel-accent: #5ed6bd; }
+    .settings-content > .section { position: relative; margin: 0; padding: 17px; background: radial-gradient(ellipse at 100% 0%, color-mix(in srgb, var(--panel-accent, #9585ff), transparent 93%), transparent 58%), linear-gradient(155deg, rgba(24,24,33,.98), rgba(17,17,23,.98)); border-color: color-mix(in srgb, var(--panel-accent, #9585ff), transparent 80%); box-shadow: inset 0 1px rgba(255,255,255,.065), 0 18px 40px -30px color-mix(in srgb, var(--panel-accent, #9585ff), transparent 48%); }
+    .settings-content > .section > .section-title { display: none; }
+    .settings-content .theme-sub { color: #9b9aa9; font-size: 10px; line-height: 1.55; margin: 3px 0 12px; padding: 7px 9px; border-left: 2px solid color-mix(in srgb, var(--panel-accent, #9585ff), transparent 48%); border-radius: 0 8px 8px 0; background: color-mix(in srgb, var(--panel-accent, #9585ff), transparent 96%); }
+    .settings-content .row { min-height: 37px; padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,.045); }
+    .settings-content .row + .row { margin-top: 3px; }
+    .settings-content .row-label { font-size: 12.5px; color: #e0deeb; }
+    .settings-content .switch { transform: scale(.96); transform-origin: right center; }
+    .view-settings .switch input:checked + .slider { background: linear-gradient(135deg, var(--panel-accent, var(--accent)), color-mix(in srgb, var(--panel-accent, var(--accent)), #fff 18%)); box-shadow: 0 0 12px -3px color-mix(in srgb, var(--panel-accent, var(--accent)), transparent 25%); }
+    .settings-content select, .settings-content input:not([type="checkbox"]):not([type="range"]):not([type="file"]) { background: rgba(255,255,255,.055) !important; color: #eeeef5 !important; border: 1px solid rgba(255,255,255,.1) !important; border-radius: 9px !important; padding: 8px 10px !important; font: inherit; outline: none; }
+    .settings-content select:focus, .settings-content input:focus { border-color: color-mix(in srgb, var(--panel-accent, #9585ff), transparent 25%) !important; box-shadow: 0 0 0 3px color-mix(in srgb, var(--panel-accent, #9585ff), transparent 88%); }
+    .settings-content .providers-toggle, .settings-content .kawarp-details { border-color: color-mix(in srgb, var(--panel-accent, #9585ff), transparent 82%); }
+    .settings-content .providers-toggle { margin-top: 10px; color: #d0cedb; background: rgba(255,255,255,.035); }
+    .settings-content .providers-toggle:hover { border-color: color-mix(in srgb, var(--panel-accent, #9585ff), transparent 48%); background: color-mix(in srgb, var(--panel-accent, #9585ff), transparent 94%); }
+    .settings-content .update-btn.primary { background: linear-gradient(135deg, var(--panel-accent, var(--accent)), color-mix(in srgb, var(--panel-accent, var(--accent)), #fff 14%)); box-shadow: 0 6px 18px -8px var(--panel-accent, var(--accent)); }
+    .transfer-module { margin-top: 16px; overflow: hidden; position: relative; display: flex; flex-direction: column; align-items: stretch; padding: 0; border: 1px solid rgba(255,255,255,.12); border-radius: 14px; background: #090b0c; box-shadow: inset 0 1px rgba(255,255,255,.1), 0 12px 30px -22px rgba(0,0,0,.9); }
+    .transfer-module-art { display: block; position: static; width: 100%; height: auto; aspect-ratio: 2 / 1; object-fit: cover; object-position: center; }
+    .transfer-content { position: relative; z-index: 1; width: auto; padding: 12px 13px; border: 0; border-top: 1px solid rgba(255,255,255,.1); border-radius: 0; background: linear-gradient(145deg, rgba(19,22,26,.98), rgba(11,13,16,.98)); box-shadow: inset 0 1px rgba(255,255,255,.055); }
+    .transfer-eyebrow { display: inline-flex; align-items: center; gap: 6px; font-size: 8px; font-weight: 800; letter-spacing: .13em; color: #dcffed; text-transform: uppercase; text-shadow: 0 1px 8px #000; }
+    .transfer-eyebrow::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #3bd879; box-shadow: 0 0 9px #3bd879; }
+    .transfer-kicker { display: flex; align-items: center; gap: 8px; }
+    .transfer-beta { display: inline-flex; align-items: center; padding: 3px 6px; border: 1px solid rgba(255,207,102,.3); border-radius: 999px; color: #ffe0a0; background: rgba(255,190,73,.12); font-size: 8px; font-weight: 800; letter-spacing: .08em; line-height: 1; text-transform: uppercase; }
+    .transfer-action-row { display: flex; align-items: end; justify-content: space-between; gap: 10px; margin-top: 5px; }
+    .transfer-headline { color: #fff; font-size: 14px; line-height: 1.2; font-weight: 750; text-shadow: 0 2px 12px #000; }
+    .transfer-caption { margin-top: 4px; color: rgba(245,247,250,.9); font-size: 9px; line-height: 1.35; text-shadow: none; }
+    .transfer-module .transfer-btn { flex: none; display: inline-flex; align-items: center; gap: 7px; padding: 9px 12px; border: 1px solid rgba(255,255,255,.22); border-radius: 9px; background: linear-gradient(110deg, #16c96a, #e92736); box-shadow: 0 4px 18px rgba(0,0,0,.38), inset 0 1px rgba(255,255,255,.26); white-space: nowrap; }
+    .transfer-module .transfer-btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+    .transfer-module .transfer-btn svg { width: 13px; height: 13px; }
+    .transfer-note { margin: 7px 3px 0 !important; padding: 0 !important; border: 0 !important; background: none !important; color: #89899a !important; font-size: 9px !important; }
+    .section-store { display: none; }
+    .view-settings, .view-announcements { display: none; }
+    .view-announcements { flex: 1 1 auto; min-height: 0; max-height: none; overflow-x: hidden; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(174,167,216,.3) transparent; }
+    .view-announcements::-webkit-scrollbar { width: 7px; }
+    .view-announcements::-webkit-scrollbar-thumb { background: rgba(174,167,216,.27); border: 2px solid transparent; background-clip: padding-box; border-radius: 8px; }
+    body.settings-open .view-home, body.announcements-open .view-home { display: none; }
+    body.settings-open .view-settings, body.announcements-open .view-announcements { display: block; }
+    body.settings-open .footer, body.announcements-open .footer { display: none; }
+    .announcement-panel-icon { width: 38px; height: 38px; display: grid; place-items: center; flex: none; overflow: hidden; border-radius: 12px; color: #c9baff; font-size: 17px; font-weight: 750; background: rgba(149,133,255,.14); border: 1px solid rgba(149,133,255,.22); }
+    .announcement-panel-icon img { display: block; width: 100%; height: 100%; object-fit: cover; }
+    .announcement-list { display: grid; gap: 9px; padding: 0 1px 14px; }
+    .announcement-card { padding: 13px 14px; border: 1px solid rgba(255,255,255,.09); border-radius: 13px; background: linear-gradient(145deg, rgba(31,31,42,.82), rgba(19,19,27,.94)); box-shadow: inset 0 1px rgba(255,255,255,.045); }
+    .announcement-card-head { display: flex; flex-direction: column; align-items: stretch; gap: 3px; }
+    .announcement-card h3 { color: #f0eef9; font-size: 12px; line-height: 1.4; font-weight: 700; overflow-wrap: anywhere; }
+    .announcement-card time { display: block; align-self: flex-end; color: #89879a; font-size: 8px; line-height: 1.3; white-space: nowrap; }
+    .announcement-card.is-unread { border-color: rgba(149,133,255,.4); background: radial-gradient(ellipse at 0% 0%, rgba(149,133,255,.12), transparent 70%), linear-gradient(145deg, rgba(34,31,48,.9), rgba(19,19,27,.96)); box-shadow: inset 0 1px rgba(255,255,255,.07), 0 7px 20px -17px rgba(171,151,255,.85); }
+    .announcement-card.is-unread h3 { color: #d9cbff; }
+    .announcement-card p { margin-top: 8px; color: #b2b0bf; font-size: 11px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .announcement-empty { padding: 22px 14px; text-align: center; color: var(--text-2); font-size: 11px; }
+    .footer { padding: 8px 0 0; }
+    .footer .home-support { max-width: 100%; }
+    .footer-credit { padding: 6px 0 1px; color: var(--text-3); font-size: 9.5px; letter-spacing: .02em; text-align: center; }
+    .footer-credit span { color: #f17691; }
+    .cache-preview-overlay, .brave-overlay { position: fixed; }
+    .cache-list { max-height: 260px; }
+    select, input[type="text"], input[type="password"], input[type="number"] { max-width: 100%; }
+    :focus-visible { outline: 2px solid #9585ff; outline-offset: 2px; }
+    @media (max-width: 480px) { html, body { width: 420px; } }
+    @media (max-width: 430px) {
+      html, body { width: 360px; }
+      body { padding: 0 10px 8px; }
+      .header { padding-top: 11px; padding-bottom: 9px; }
+      .home-intro { padding: 7px 2px 9px; }
+      .home-intro h2 { font-size: 16px; }
+      .home-grid { gap: 6px; padding-bottom: 6px; }
+      .home-card { min-height: 0; padding: 8px 9px; border-radius: 12px; }
+      .home-card-icon { width: 34px; height: 34px; border-radius: 10px; }
+      .home-card-icon img { inset: 3px; width: 28px; height: 28px; }
+      .home-card[data-feature="spotify-canvas"] .home-card-icon img { width: 46px; height: 46px; }
+      .home-card-description { margin-top: 6px; font-size: 9px; line-height: 1.25; }
+    }
+
   </style>
 </head>
 <body>
@@ -856,6 +994,10 @@
       <h1>Vivimusic Web</h1>
       <p>Apple Music artwork, synced lyrics &amp; Spotify Canvas for YT Music</p>
     </div>
+    <button class="announcement-button" type="button" aria-label="Announcements" title="Announcements">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg>
+      <span class="announcement-badge" hidden>0</span>
+    </button>
   </div>
 
   <!-- Canvas toggle + status -->
@@ -868,7 +1010,7 @@
         <span class="slider"></span>
       </label>
     </div>
-    <p class="theme-sub">Fetches Apple Music-style animated artwork for the current track. Used whenever Spotify Canvas (below) is off or has nothing for that track — both can be on at once.</p>
+    <p class="theme-sub">Fetches Apple Music-style animated artwork for the active and next available track.</p>
 
     <div class="row" style="margin-top:10px;">
       <span class="row-label">Image-only mode</span>
@@ -987,7 +1129,7 @@
         <span class="slider"></span>
       </label>
     </div>
-    <p class="theme-sub">Pulls from LRCLIB and the BetterLyrics API — word-synced lyrics shown when available, otherwise line-synced, otherwise plain. Use the +/− next to "Lyrics via …" if a specific song's timing is a little off — it's saved per song and provider.</p>
+    <p class="theme-sub">Pulls lyrics data from LRCLIB,BetterLyrics,Unison,Musixmatch,Binilyrics,Spotify — word-synced lyrics shown when available, otherwise line-synced, otherwise plain. Use the +/− next to "Lyrics via …" if a specific song's timing is a little off — it's saved per song and provider.Also can be refetched from other providers</p>
 
     <div class="row" style="margin-top:8px;">
       <span class="row-label">Lyrics alignment</span>
@@ -1070,7 +1212,7 @@
         <label class="switch small"><input type="checkbox" id="prov-binilyrics" checked/><span class="slider"></span></label>
       </div>
       <div class="provider-row">
-        <span>Spotify (fallback, needs Spotify connected)</span>
+        <span>Spotify (Needs Spotify Account Connected)</span>
         <label class="switch small"><input type="checkbox" id="prov-spotify" checked/><span class="slider"></span></label>
       </div>
     </div>
@@ -1114,7 +1256,7 @@
         <span class="slider"></span>
       </label>
     </div>
-    <p class="theme-sub">By Chengggit)</p>
+    <p class="theme-sub">By Chengggit</p>
   </div>
 
   <!-- Artwork cache -->
@@ -1175,62 +1317,6 @@
     </div>
     <p class="theme-sub">If a track has both a Spotify Canvas and Apple Music-style artwork: picking Spotify always prefers it. Picking Apple Music only shows it instantly if that track's artwork is already cached — otherwise Spotify Canvas plays immediately while Apple Music's artwork downloads quietly in the background, ready for instant playback the next time you play that song.</p>
 
-    <span class="info-btn" id="braveFixBtn" tabindex="0" role="button" aria-label="Using Brave Browser? View login fix" style="margin-top:9px;">
-      <span class="info-btn-dot">i</span>
-      <span>Using Brave Browser? View this</span>
-    </span>
-
-    <div class="brave-overlay" id="braveOverlay" role="dialog" aria-modal="true" aria-label="Brave login fix guide">
-      <div class="brave-overlay-head">
-        <div class="brave-overlay-brand"><span class="dot"></span>Vivimusic Web</div>
-        <button class="brave-close-btn" id="braveOverlayClose" aria-label="Close">✕</button>
-      </div>
-      <div class="brave-overlay-body">
-        <div class="brave-title-row">
-          <h2>Brave keeps logging you out?</h2>
-          <span class="brave-tag">BRAVE FIX</span>
-        </div>
-        <p class="brave-sub">Brave's privacy settings mistake Spotify's persistent login cookies for temporary data and wipe them on close. Fix it permanently in 3 steps.</p>
-
-        <div class="brave-step">
-          <div class="brave-step-head"><span class="brave-step-num">1</span>Disable hidden "Ephemeral" storage</div>
-          <ol>
-            <li data-i="1">Open a new tab → <code>brave://flags</code></li>
-            <li data-i="2">Search "Storage"</li>
-            <li data-i="3">Find "Enable First Party Ephemeral Storage"</li>
-            <li data-i="4">Set it to <b>Disabled</b></li>
-            <li data-i="5">Click <b>Relaunch</b></li>
-          </ol>
-        </div>
-
-        <div class="brave-step">
-          <div class="brave-step-head"><span class="brave-step-num">2</span>Exempt Spotify from data deletion</div>
-          <ol>
-            <li data-i="1">Open <code>brave://settings/content/siteData</code></li>
-            <li data-i="2">Under "Allowed to save data," click <b>Add</b></li>
-            <li data-i="3">Enter <code>[*.]spotify.com</code></li>
-            <li data-i="4">Remove Spotify from "Delete on close" if listed</li>
-          </ol>
-        </div>
-
-        <div class="brave-step">
-          <div class="brave-step-head"><span class="brave-step-num">3</span>Clear broken cookies &amp; log back in</div>
-          <ol>
-            <li data-i="1">Open the Spotify Web Player</li>
-            <li data-i="2">Click the 🔒 padlock → Site settings → <b>Clear data</b></li>
-            <li data-i="3">Refresh and log in with your password</li>
-          </ol>
-        </div>
-
-        <div class="brave-note">
-          <span class="ico">⚠️</span>
-          <span>Avoid temporary 6-digit email login codes — use your password so the session persists.</span>
-        </div>
-
-        <button class="brave-done-btn" id="braveOverlayDone">Got it, close</button>
-      </div>
-    </div>
-
     <div id="spotifyDisconnected" style="margin-top:11px; display:flex; flex-direction:column; gap:7px;">
       <button id="spotifyConnectBtn" class="update-btn primary" style="width:100%;">Connect Spotify</button>
       <input id="spotifySpDc" type="password" placeholder="Or paste sp_dc cookie"
@@ -1247,10 +1333,23 @@
       </div>
       <button id="spotifyDisconnectBtn" class="clear-btn" style="margin-top:7px;">Disconnect Spotify</button>
     </div>
-    <div style="margin-top:12px;">
-      <button id="spotifyTransferBtn" class="update-btn primary" style="width:100%;">Spotify → YouTube Music</button>
-      <div class="theme-sub" style="margin-top:6px;">Transfer liked songs and selected playlists in a separate transfer window.</div>
+    <div class="transfer-module">
+      <img class="transfer-module-art" src="../icons/popup/spotify-ytmusic.png" alt="Spotify playlists moving to YouTube Music" />
+      <div class="transfer-content">
+        <div class="transfer-kicker"><span class="transfer-eyebrow">Playlist transfer</span><span class="transfer-beta">Beta</span></div>
+        <div class="transfer-action-row">
+          <div>
+            <div class="transfer-headline">Take your music with you</div>
+            <div class="transfer-caption">Spotify to YouTube Music, in Just few clicks.</div>
+          </div>
+          <button id="spotifyTransferBtn" class="update-btn primary transfer-btn">
+            Start transfer
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+          </button>
+        </div>
+      </div>
     </div>
+    <p class="theme-sub transfer-note">Choose liked songs and playlists in a separate transfer window.</p>
   </div>
 
   <!-- Last.fm -->
@@ -1313,7 +1412,13 @@
     <div class="update-status" id="updateStatus"></div>
   </div>
 
-  <div class="footer">Made with love by Archimetrix</div>
+  <div class="footer">
+    <div class="home-support"><span class="home-support-copy">Enjoying Vivimusic?</span><span class="home-support-actions">
+      <a class="support-pill" href="https://github.com/Archimetrix" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .8a11.2 11.2 0 0 0-3.54 21.83c.56.1.77-.24.77-.54v-2.1c-3.13.68-3.79-1.33-3.79-1.33-.51-1.3-1.25-1.64-1.25-1.64-1.02-.7.08-.69.08-.69 1.12.08 1.71 1.15 1.71 1.15 1 1.7 2.63 1.21 3.27.92.1-.72.39-1.21.71-1.49-2.5-.28-5.13-1.25-5.13-5.56 0-1.23.44-2.23 1.15-3.02-.12-.28-.5-1.43.11-2.98 0 0 .94-.3 3.08 1.15a10.72 10.72 0 0 1 5.61 0c2.14-1.45 3.07-1.15 3.07-1.15.62 1.55.23 2.7.12 2.98.72.79 1.15 1.79 1.15 3.02 0 4.32-2.63 5.27-5.14 5.55.4.35.75 1.03.75 2.08v3.11c0 .3.2.65.78.54A11.2 11.2 0 0 0 12 .8Z"/></svg>Follow dev</a>
+      <a class="support-pill coffee" href="https://buymeacoffee.com/archimetrix" target="_blank" rel="noopener noreferrer"><svg class="bmc-mark" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.9 0 5.68 2.8H3.88v2.52h.69l.7 4.48H4.17l1.46 8.23.94-.01L7.51 24h8.92l.94-5.98.89.01 1.46-8.23h-1.06l.71-4.48h.75V2.8h-1.92L16.99 0H6.9Zm.53.8h9.04l.77 1.78H6.65l.78-1.78ZM4.68 3.6h14.64v.92H4.68V3.6Zm.45 7h13.64l-1.18 6.62-5.65-.06-5.64.06-1.17-6.62Z"/></svg>Buy me a coffee</a>
+    </span></div>
+    <div class="footer-credit">Made with <span aria-label="love">♥</span> by Archimetrix</div>
+  </div>
 
   <div class="cache-preview-overlay" id="cachePreviewOverlay">
     <button class="cache-preview-close" id="cachePreviewClose" title="Close" aria-label="Close preview">
@@ -1329,7 +1434,7 @@
     </div>
   </div>
 
-  <script src="info-popover.js"></script>
+  <script src="popup-ui.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

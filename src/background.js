@@ -51,6 +51,117 @@ const RELEASES_API = `https://api.github.com/repos/${REPO}/releases/latest`;
 const RELEASES_PAGE = `https://github.com/${REPO}/releases/latest`;
 const ALARM_NAME = 'vivi-update-check';
 const CHECK_INTERVAL_MIN = 12 * 60; // twice a day
+const ANNOUNCEMENTS_URL = 'https://raw.githubusercontent.com/Archimetrix/storage-project-files/main/vivimusicwebannoucement.json';
+let announcementsCheckPromise = null;
+
+function announcementId(item, index) {
+  return String(item.id || `${item.timestamp || ''}:${item.title || ''}:${index}`);
+}
+
+function sortAnnouncements(items) {
+  return [...items].sort((a, b) => {
+    const ta = Date.parse(a.timestamp || '') || 0;
+    const tb = Date.parse(b.timestamp || '') || 0;
+    return tb - ta;
+  });
+}
+
+async function checkAnnouncements() {
+  if (announcementsCheckPromise) return announcementsCheckPromise;
+  announcementsCheckPromise = (async () => {
+    const saved = await chrome.storage.local.get([
+      'vivi_announcements', 'vivi_announcements_seen_ids'
+    ]);
+    const cached = Array.isArray(saved.vivi_announcements) ? saved.vivi_announcements : [];
+    const seenIds = Array.isArray(saved.vivi_announcements_seen_ids) ? saved.vivi_announcements_seen_ids : [];
+    try {
+      const response = await fetch(ANNOUNCEMENTS_URL, { cache: 'no-store', headers: { Accept: 'application/json' } });
+      if (!response.ok) throw new Error(`Announcements request failed (${response.status})`);
+      const payload = await response.json();
+      if (!Array.isArray(payload)) throw new Error('Announcements feed is not a JSON array');
+      const announcements = sortAnnouncements(payload.filter(item => item && typeof item === 'object').map((item, index) => ({
+        id: announcementId(item, index),
+        title: String(item.title || ''),
+        message: String(item.message || ''),
+        timestamp: String(item.timestamp || '')
+      })));
+      await chrome.storage.local.set({
+        vivi_announcements: announcements,
+        vivi_announcements_checked_at: Date.now()
+      });
+      const unreadCount = announcements.filter(item => !seenIds.includes(item.id)).length;
+      return { ok: true, announcements, seenIds, unreadCount };
+    } catch (error) {
+      const announcements = sortAnnouncements(cached);
+      return {
+        ok: false,
+        error: String(error?.message || error),
+        announcements,
+        seenIds,
+        unreadCount: announcements.filter(item => !seenIds.includes(item.id)).length
+      };
+    }
+  })().finally(() => { announcementsCheckPromise = null; });
+  return announcementsCheckPromise;
+}
+
+async function getYtMusicAnnouncements() {
+  const result = await checkAnnouncements();
+  if (!result.ok) return { ok: false, announcements: [] };
+  const { vivi_announcements_toasted_ids: toasted = [] } = await chrome.storage.local.get('vivi_announcements_toasted_ids');
+  const announcements = result.announcements.filter(item =>
+    !result.seenIds.includes(item.id) && !toasted.includes(item.id)
+  );
+  return { ok: true, announcements };
+}
+
+async function markAnnouncementsToasted(ids) {
+  const safeIds = Array.isArray(ids) ? ids.map(String).filter(Boolean) : [];
+  const { vivi_announcements_toasted_ids: existing = [] } = await chrome.storage.local.get('vivi_announcements_toasted_ids');
+  const toasted = [...new Set([...existing, ...safeIds])];
+  await chrome.storage.local.set({ vivi_announcements_toasted_ids: toasted });
+  return { ok: true };
+}
+
+async function markAnnouncementsSeen() {
+  const { vivi_announcements: items = [], vivi_announcements_seen_ids: seen = [] } = await chrome.storage.local.get([
+    'vivi_announcements', 'vivi_announcements_seen_ids'
+  ]);
+  const announcements = sortAnnouncements(Array.isArray(items) ? items : []);
+  const seenIds = [...new Set([...seen, ...announcements.map((item, index) => announcementId(item, index))])];
+  await chrome.storage.local.set({ vivi_announcements_seen_ids: seenIds });
+  return { ok: true, announcements, seenIds, unreadCount: 0 };
+}
+
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.type === 'VIVI_ANNOUNCEMENTS_CHECK') {
+    checkAnnouncements().then(sendResponse);
+    return true;
+  }
+  if (msg.type === 'VIVI_ANNOUNCEMENTS_MARK_SEEN') {
+    markAnnouncementsSeen().then(sendResponse);
+    return true;
+  }
+  if (msg.type === 'VIVI_ANNOUNCEMENTS_FOR_YTMUSIC') {
+    if (sender.url && !sender.url.startsWith('https://music.youtube.com/')) {
+      sendResponse({ ok: false, announcements: [] });
+      return false;
+    }
+    getYtMusicAnnouncements().then(sendResponse).catch(error => {
+      console.warn('[Vivi] YouTube Music announcement fetch failed:', error);
+      sendResponse({ ok: false, announcements: [] });
+    });
+    return true;
+  }
+  if (msg.type === 'VIVI_ANNOUNCEMENTS_TOASTED') {
+    if (sender.url && !sender.url.startsWith('https://music.youtube.com/')) {
+      sendResponse({ ok: false });
+      return false;
+    }
+    markAnnouncementsToasted(msg.ids).then(sendResponse).catch(() => sendResponse({ ok: false }));
+    return true;
+  }
+});
 
 function parseVersion(v) {
   return String(v || '').trim().replace(/^v/i, '').split('.').map((n) => parseInt(n, 10) || 0);

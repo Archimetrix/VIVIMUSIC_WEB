@@ -16,20 +16,14 @@
   const OVERLAY_ID = 'vivi-star-gate';
 
   const baseStyle = `
-    position: fixed;
-    inset: 0;
-    z-index: 2147483647;
-    background: #030303;
-    color: #fff;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 16px;
-    font-family: 'Roboto', Arial, sans-serif;
-    text-align: center;
-    padding: 32px;
+    position: fixed; inset: 0; z-index: 2147483647;
+    display: flex; align-items: center; justify-content: center;
+    overflow: auto; padding: 28px 18px; box-sizing: border-box;
+    color: #f7f7fc; text-align: left; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: radial-gradient(ellipse at 50% 0%, rgba(113,92,230,.24), transparent 52%), radial-gradient(ellipse at 100% 100%, rgba(33,188,143,.1), transparent 44%), #0b0b12;
   `;
+
+
 
   function render(html) {
     let el = document.getElementById(OVERLAY_ID);
@@ -39,7 +33,11 @@
       el.style.cssText = baseStyle;
       (document.documentElement || document.body).appendChild(el);
     }
-    el.innerHTML = html;
+    el.replaceChildren();
+    const stage = document.createElement('div');
+    stage.className = 'gate-stage';
+    stage.innerHTML = html;
+    el.append(stage);
     return el;
   }
 
@@ -48,48 +46,49 @@
     window.__viviStarVerified = true;
   }
 
-  function btnHtml(id, label) {
-    return `<button id="${id}" style="padding:10px 22px;border-radius:8px;border:none;background:#fff;color:#000;font-weight:600;font-size:14px;cursor:pointer;">${label}</button>`;
+  function brandHtml() {
+    return `<div class="gate-brand"><img src="${chrome.runtime.getURL('icons/icon128.png')}" alt=""><div><div class="gate-brand-name">Vivimusic Web</div><div class="gate-brand-tagline">A more personal way to enjoy your music</div></div></div>`;
+  }
+
+  function pageHtml(content, footer = 'Your music stays yours. GitHub securely handles account verification.') {
+    return `<div class="gate-shell">${brandHtml()}<div class="gate-body">${content}</div><div class="gate-footer">${footer}</div></div>`;
+  }
+
+  function btnHtml(id, label, secondary = false) {
+    return `<button id="${id}" class="gate-button${secondary ? ' secondary' : ''}" type="button">${label}</button>`;
   }
 
   function renderLocked() {
-    const el = render(`
-      <div style="font-size:32px;">⭐</div>
-      <h2 style="margin:0;font-size:20px;">Support Vivimusic Web</h2>
-      <p style="max-width:420px;opacity:.75;font-size:14px;line-height:1.5;">
-        This extension is free to use. In exchange, please star the
-        <a href="${REPO_URL}" target="_blank" style="color:#7fd1ff;">GitHub repo</a>
-        to unlock it. You'll sign in with GitHub to verify — this extension never
-        sees your password, only a confirmation of whether your account has starred the repo.
-      </p>
-      ${btnHtml('vivi-gate-start', 'Verify with GitHub')}
-      <div id="vivi-gate-status" style="font-size:12px;opacity:.6;min-height:16px;"></div>
-    `);
+    const el = render(pageHtml(`
+      <div class="gate-kicker">One-time community check</div>
+      <h1 class="gate-title">Unlock your music setup</h1>
+      <p class="gate-description">Vivimusic Web is free to use. Star the project on GitHub, then verify your account to unlock the extension.</p>
+      <div class="gate-steps">
+        <div class="gate-step"><span class="gate-step-number">01</span><span class="gate-step-label">Visit the project</span></div>
+        <div class="gate-step"><span class="gate-step-number">02</span><span class="gate-step-label">Star it on GitHub</span></div>
+        <div class="gate-step"><span class="gate-step-number">03</span><span class="gate-step-label">Verify and listen</span></div>
+      </div>
+      <div class="gate-trust"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-11V5l-8-3-8 3v6c0 7 8 11 8 11Z"/><path d="m9 12 2 2 4-4"/></svg><span>Sign-in happens on GitHub. Vivimusic never sees or stores your password; we only receive confirmation of your star.</span></div>
+      <div class="gate-actions">${btnHtml('vivi-gate-start', 'Continue with GitHub')}<a class="gate-button secondary" href="${REPO_URL}" target="_blank" rel="noopener noreferrer">View the project ↗</a></div>
+      <div id="vivi-gate-status" class="gate-status" aria-live="polite"></div>
+    `));
     el.querySelector('#vivi-gate-start').addEventListener('click', beginAuth);
   }
 
   function renderCode(user_code, verification_uri) {
-    const el = render(`
-      <h2 style="margin:0;font-size:20px;">One more step</h2>
-      <p style="opacity:.75;font-size:14px;">
-        Open <a href="${verification_uri}" target="_blank" style="color:#7fd1ff;">${verification_uri}</a>
-        and enter this code:
-      </p>
-      <div style="display:flex;align-items:center;gap:10px;">
-        <div style="font-size:28px;letter-spacing:5px;font-weight:700;background:#111;padding:12px 24px;border-radius:8px;">${user_code}</div>
-        <button id="vivi-gate-copy" title="Copy code" style="display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:#111;color:#fff;cursor:pointer;">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-        </button>
-      </div>
-      <p style="opacity:.55;font-size:13px;">Waiting for you to confirm on GitHub…</p>
-    `);
+    const el = render(pageHtml(`
+      <div class="gate-kicker">Secure GitHub verification</div>
+      <h1 class="gate-title">Confirm it’s you</h1>
+      <p class="gate-description">Open <a class="gate-link" href="${verification_uri}" target="_blank" rel="noopener noreferrer">${verification_uri}</a> and enter this one-time code. Keep this page open while GitHub confirms.</p>
+      <div class="gate-code"><div class="gate-code-value">${user_code}</div><button id="vivi-gate-copy" class="gate-copy" type="button" title="Copy code" aria-label="Copy code"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div>
+      <div class="gate-wait"><span class="gate-spinner"></span><span>Waiting for GitHub to confirm…</span></div>
+    `));
 
     const copyBtn = el.querySelector('#vivi-gate-copy');
     copyBtn?.addEventListener('click', async () => {
       try {
         await navigator.clipboard.writeText(user_code);
       } catch {
-        // Fallback for contexts where the Clipboard API is unavailable
         const ta = document.createElement('textarea');
         ta.value = user_code;
         ta.style.position = 'fixed';
@@ -100,31 +99,28 @@
         ta.remove();
       }
       const original = copyBtn.innerHTML;
-      copyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+      copyBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#68e1ae" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
       setTimeout(() => { copyBtn.innerHTML = original; }, 1200);
     });
   }
 
   function renderNotStarred() {
-    const el = render(`
-      <div style="font-size:32px;">👀</div>
-      <h2 style="margin:0;font-size:20px;">Almost there</h2>
-      <p style="opacity:.75;font-size:14px;max-width:420px;">
-        You're verified, but this GitHub account hasn't starred the repo yet.
-        Star it, then click retry.
-      </p>
-      <a href="${REPO_URL}" target="_blank" style="color:#7fd1ff;font-size:14px;">Open the repo →</a>
-      ${btnHtml('vivi-gate-retry', "I've starred it — retry")}
-    `);
+    const el = render(pageHtml(`
+      <div class="gate-kicker">Verification complete</div>
+      <h1 class="gate-title">One small step left</h1>
+      <p class="gate-description">This GitHub account is verified, but it hasn’t starred the Vivimusic Web project yet. Star the repo, then come back and retry.</p>
+      <div class="gate-actions" style="margin-top:18px;">${btnHtml('vivi-gate-retry', 'I’ve starred it — check again')}<a class="gate-button secondary" href="${REPO_URL}" target="_blank" rel="noopener noreferrer">Open GitHub repo ↗</a></div>
+    `));
     el.querySelector('#vivi-gate-retry').addEventListener('click', recheck);
   }
 
   function renderError(message) {
-    const el = render(`
-      <h2 style="margin:0;font-size:20px;">Something went wrong</h2>
-      <p style="opacity:.75;font-size:14px;max-width:420px;">${message}</p>
-      ${btnHtml('vivi-gate-start', 'Try again')}
-    `);
+    const el = render(pageHtml(`
+      <div class="gate-kicker">Connection issue</div>
+      <h1 class="gate-title">Let’s try that again</h1>
+      <p class="gate-description">${message}</p>
+      <div class="gate-actions" style="margin-top:18px;">${btnHtml('vivi-gate-start', 'Try again')}</div>
+    `, 'Your GitHub account and star are never changed by retrying verification.'));
     el.querySelector('#vivi-gate-start').addEventListener('click', beginAuth);
   }
 

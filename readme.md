@@ -7,7 +7,7 @@
 **Apple Music–style Canvas artwork, Spotify Canvas, synced lyrics, Last.fm scrobbling, and a Spotify → YouTube Music playlist transfer tool for YouTube Music.**
 
 [![Manifest](https://img.shields.io/badge/Manifest-V3-ff6b6b?style=flat-square)](#)
-[![Version](https://img.shields.io/badge/Version-8.2.1-4ecdc4?style=flat-square)](#)
+[![Version](https://img.shields.io/badge/Version-9.0-4ecdc4?style=flat-square)](#)
 [![Browsers](https://img.shields.io/badge/Chrome%20%7C%20Edge%20%7C%20Brave%20%7C%20Other%20Chromium%20Browsers-supported-6c5ce7?style=flat-square)](#)
 [![Copyright](https://img.shields.io/badge/Copyright-%C2%A9%202026%20Archimetrix.%20All%20rights%20reserved-f39c12?style=flat-square)](LICENSE)
 </div>
@@ -27,8 +27,8 @@ This extension is **not published on the Chrome Web Store**. It's distributed as
 
 <div align="center">
 
-<a href="https://files.catbox.moe/ycpt9e.mp4">
-  <img src="https://i.postimg.cc/fW1X0w66/vivimusicweb.gif" alt="Vivimusic Web demo — click to watch the full video" width="720" />
+<a href="https://youtu.be/d4SHceAjRGk">
+  <img src="https://github.com/Archimetrix/storage-project-files/blob/main/random-share/vivimusicdemo.gif" alt="Vivimusic Web demo — click to watch the full video" width="720" />
 </a>
 
 **Click the preview above to watch the full video** 
