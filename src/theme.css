@@ -1563,14 +1563,7 @@ ytmusic-player-page::before {
   opacity: var(--bg-player-opacity);
 }
 
-ytmusic-player-page::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -49;
-  background: rgba(0, 0, 0, 0.45);
-  pointer-events: none;
-}
+/* (removed) full-screen rgba(0,0,0,.45) darkening overlay on the player page */
 }
 
 ytmusic-player-page:not([is-mweb-modernization-enabled]) {
@@ -1578,8 +1571,15 @@ ytmusic-player-page:not([is-mweb-modernization-enabled]) {
   backdrop-filter: blur(60px);
 }
 
+/* The page under the full player (Home / playlists / albums) used to be kept
+   visible, so its cards ghosted through the translucent, blurred player page
+   on top of the Kawarp background. Hide it once the open animation has
+   finished (the delayed visibility transition keeps the slide-up smooth);
+   when the player closes the attribute is removed, so it reappears at once
+   for the slide-down. */
 ytmusic-app-layout[player-page-open]:not([is-mweb-modernization-enabled]) > #content {
-  visibility: visible !important;
+  visibility: hidden !important;
+  transition: visibility 0s linear var(--anim-player-page-duration) !important;
 }
 
 ytmusic-app-layout[player-fullscreened] > [slot=content] {

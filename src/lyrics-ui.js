@@ -15,11 +15,13 @@
   const EXCLUDED_DB_PFX = 'vivi_lyrics_excluded_';
   let isRefetchingLyrics = false;
 
-  let settings = { lyricsEnabled: true, autoSwitchLyrics: true, lyricsShowForVideos: true, dancerOnNotFound: true };
+  let settings = { lyricsEnabled: true, autoSwitchLyrics: true, lyricsShowForVideos: false, dancerOnNotFound: true };
   let currentTrackKey = null;
   let currentResult = null;  
   let isLoadingLyrics = false;
   let rafId = null;
+  let lastRenderedKey = '';
+  let anchorLineEl = null; // last line that was active; keeps blur distances stable in gaps
   let activeLineEl = null;
   let tabObserver = null;
   let syncRaf = null;
@@ -46,9 +48,51 @@
   let currentIsVideo = false;
   const VIDEO_BLOCKED = Object.freeze({ videoBlocked: true });
 
+  // Lyrics fonts are loaded through the FontFace API from the content script
+  // instead of relying only on the @font-face rules in lyrics-fonts.css.
+  // Those rules need the page to allow the extension URL as a font source,
+  // which music.youtube.com does not always do — the lyrics then silently
+  // fell back to the default font. Fetching the file from the extension and
+  // handing the bytes to FontFace avoids the page's CSP entirely.
+  const LYRICS_FONT_FILES = {
+    playfair:     { family: 'ViviLyr Playfair',      file: 'playfair-display.woff2', weight: '400 900' },
+    cormorant:    { family: 'ViviLyr Cormorant',     file: 'cormorant.woff2',        weight: '300 700', sizeAdjust: '118%' },
+    dmserif:      { family: 'ViviLyr DM Serif',      file: 'dm-serif-display.woff2', weight: '400' },
+    lora:         { family: 'ViviLyr Lora',          file: 'lora.woff2',             weight: '400 700' },
+    poppins:      { family: 'ViviLyr Poppins',       file: 'poppins.woff2',          weight: '700' },
+    montserrat:   { family: 'ViviLyr Montserrat',    file: 'montserrat.woff2',       weight: '100 900' },
+    outfit:       { family: 'ViviLyr Outfit',        file: 'outfit.woff2',           weight: '100 900' },
+    spacegrotesk: { family: 'ViviLyr Space Grotesk', file: 'space-grotesk.woff2',    weight: '300 700' },
+    caveat:       { family: 'ViviLyr Caveat',        file: 'caveat.woff2',           weight: '400 700', sizeAdjust: '125%' },
+    dancing:      { family: 'ViviLyr Dancing',       file: 'dancing-script.woff2',   weight: '400 700', sizeAdjust: '112%' },
+    pacifico:     { family: 'ViviLyr Pacifico',      file: 'pacifico.woff2',         weight: '400',     sizeAdjust: '92%' },
+    bebas:        { family: 'ViviLyr Bebas',         file: 'bebas-neue.woff2',       weight: '400',     sizeAdjust: '110%' },
+  };
+  const loadedLyricsFonts = new Set();
+  async function ensureLyricsFontLoaded(id) {
+    const key = String(id || '').replace(/[^a-z0-9]/gi, '');
+    const def = LYRICS_FONT_FILES[key];
+    if (!def || loadedLyricsFonts.has(key)) return;
+    loadedLyricsFonts.add(key);
+    try {
+      const res = await fetch(chrome.runtime.getURL('src/fonts/' + def.file));
+      const buf = await res.arrayBuffer();
+      const desc = { weight: def.weight, display: 'swap' };
+      if (def.sizeAdjust) desc.sizeAdjust = def.sizeAdjust;
+      const face = new FontFace(def.family, buf, desc);
+      await face.load();
+      document.fonts.add(face);
+      // Re-apply so the line re-lays-out with the freshly loaded face.
+      applyLyricsStyleClasses();
+    } catch (e) {
+      loadedLyricsFonts.delete(key);
+      console.debug('[Vivimusic] lyrics font failed to load:', key, e);
+    }
+  }
+
   chrome.storage.local.get(
-    { lyricsEnabled: true, autoSwitchLyrics: true, lyricsShowForVideos: true, dancerOnNotFound: true, lyricsAlign: 'left', lyricsAnimationStyle: 'fill' },
-    (s) => { settings = s; }
+    { lyricsEnabled: true, autoSwitchLyrics: true, lyricsShowForVideos: false, dancerOnNotFound: true, lyricsAlign: 'center', lyricsAnimationStyle: 'apple', lyricsFont: 'default' },
+    (s) => { settings = s; applyLyricsStyleClasses(); }
   );
 
   chrome.runtime.onMessage.addListener((msg) => {
@@ -63,6 +107,10 @@
       settings.lyricsAlign = msg.lyricsAlign;
       applyLyricsStyleClasses();
     }
+    if ('lyricsFont' in msg) {
+      settings.lyricsFont = msg.lyricsFont;
+      applyLyricsStyleClasses();
+    }
     if ('lyricsAnimationStyle' in msg) {
       settings.lyricsAnimationStyle = msg.lyricsAnimationStyle;
       applyLyricsStyleClasses();
@@ -71,7 +119,7 @@
       const active = document.querySelector('.vivi-lyrics-line.vivi-lyrics-active');
       active?.querySelectorAll('.vivi-lyrics-word').forEach((w) => {
         delete w.dataset.fillState;
-        w.classList.remove('vivi-lyrics-word-glowing', 'vivi-lyrics-word-bouncing');
+        w.classList.remove('vivi-lyrics-word-glowing', 'vivi-lyrics-word-bouncing', 'vivi-lyrics-syl-swell');
       });
     }
     if ('dancerOnNotFound' in msg) {
@@ -634,16 +682,50 @@
     }
   }
 
+  // Apple Music style blurs lines progressively the further they are from the
+  // active line. Store each line's distance as a CSS variable.
+  function updateLineDistances(listEl) {
+    const list = listEl || document.querySelector('.vivi-lyrics-list');
+    if (!list || !list.classList.contains('vivi-lyrics-anim-apple')) return;
+    const lines = list.querySelectorAll('.vivi-lyrics-line');
+    let activeIdx = -1;
+    lines.forEach((el, i) => { if (el.classList.contains('vivi-lyrics-active')) activeIdx = i; });
+    // Between lines (instrumental gaps / tiny gaps between timestamps) no line
+    // is active. Falling back to "everything is distance 1" made the line that
+    // had just been sung snap from sharp to blurred, then back to sharp when the
+    // next line began -- a visible blur flicker. Keep measuring from the last
+    // active line instead so the blur layout stays constant.
+    if (activeIdx < 0 && anchorLineEl && anchorLineEl.isConnected) {
+      const i = Array.prototype.indexOf.call(lines, anchorLineEl);
+      if (i >= 0) activeIdx = i;
+    }
+    lines.forEach((el, i) => {
+      el.style.setProperty('--vivi-d', activeIdx < 0 ? 1 : Math.min(Math.abs(i - activeIdx), 5));
+    });
+  }
+
   // Re-applies the alignment/animation-style classes to an already-rendered
   // list without rebuilding it, so flipping a setting mid-song updates the
   // panel immediately.
   function applyLyricsStyleClasses(listEl) {
     const list = listEl || document.querySelector('.vivi-lyrics-list');
     if (!list) return;
+    // Smooth zoom and Apple Music are left-aligned by design, whatever the
+    // alignment setting says.
+    const forceLeft = settings.lyricsAnimationStyle === 'zoom' || settings.lyricsAnimationStyle === 'apple';
     list.classList.remove('vivi-lyrics-align-left', 'vivi-lyrics-align-center', 'vivi-lyrics-align-right');
-    list.classList.add('vivi-lyrics-align-' + (settings.lyricsAlign || 'left'));
+    list.classList.add('vivi-lyrics-align-' + (forceLeft ? 'left' : (settings.lyricsAlign || 'center')));
     list.classList.toggle('vivi-lyrics-anim-glow', settings.lyricsAnimationStyle === 'glow');
     list.classList.toggle('vivi-lyrics-anim-bounce', settings.lyricsAnimationStyle === 'bounce');
+    list.classList.toggle('vivi-lyrics-anim-zoom', settings.lyricsAnimationStyle === 'zoom');
+    list.classList.toggle('vivi-lyrics-anim-apple', settings.lyricsAnimationStyle === 'apple');
+    updateLineDistances(list);
+    // Lyrics-only font: swap just the vivi-lyrics-font-* class on the list.
+    [...list.classList].filter((c) => c.startsWith('vivi-lyrics-font-')).forEach((c) => list.classList.remove(c));
+    if (settings.lyricsFont && settings.lyricsFont !== 'default') {
+      list.classList.add('vivi-lyrics-font-' + String(settings.lyricsFont).replace(/[^a-z0-9]/gi, ''));
+      ensureLyricsFontLoaded(settings.lyricsFont);
+    }
   }
 
   function renderPanel(result) {
@@ -679,20 +761,36 @@
       lineEl.className = 'vivi-lyrics-line';
       lineEl.dataset.index = String(i);
 
-      if (result.mode === 'word') {
-        line.words.forEach((w, wi) => {
+      if ((result.mode === 'word' || result.mode === 'syllable') && Array.isArray(line.words) && line.words.length) {
+        const makeUnit = (u, extra) => {
           const span = document.createElement('span');
-          span.className = 'vivi-lyrics-word';
-          span.dataset.start = String(w.start);
-          span.dataset.end = String(w.end);
-          span.textContent = w.text;
-          if (result.mode !== 'plain') {
-            span.addEventListener('click', (e) => {
-              e.stopPropagation();
-              seekTo(w.start);
+          span.className = 'vivi-lyrics-word' + (extra ? ' ' + extra : '');
+          span.dataset.start = String(u.start);
+          span.dataset.end = String(u.end);
+          span.textContent = u.text;
+          span.addEventListener('click', (e) => {
+            e.stopPropagation();
+            seekTo(u.start);
+          });
+          return span;
+        };
+        line.words.forEach((w) => {
+          if (result.mode === 'syllable') {
+            // Each word is a group; each syllable inside it is the unit
+            // that actually animates (see tick()).
+            const group = document.createElement('span');
+            group.className = 'vivi-lyrics-wordgroup'
+              + (w.joined ? ' vivi-lyrics-wordgroup-joined' : '')
+              + (w.bg ? ' vivi-lyrics-wordgroup-bg' : '');
+            group.dataset.start = String(w.start);
+            group.dataset.end = String(w.end);
+            (w.syllables && w.syllables.length ? w.syllables : [w]).forEach((sy) => {
+              group.appendChild(makeUnit(sy, 'vivi-lyrics-syl'));
             });
+            lineEl.appendChild(group);
+          } else {
+            lineEl.appendChild(makeUnit(w, (w.joined ? 'vivi-lyrics-word-joined ' : '') + (w.bg ? 'vivi-lyrics-word-bg' : '')));
           }
-          lineEl.appendChild(span);
         });
       } else {
         lineEl.textContent = line.text;
@@ -714,7 +812,8 @@
 
       const credit = document.createElement('span');
       credit.className = 'vivi-lyrics-credit';
-      credit.textContent = `Lyrics via ${result.provider}`;
+      const levelLabel = { syllable: 'syllable-synced', word: 'word-synced', line: 'line-synced' }[result.mode];
+      credit.textContent = `Lyrics via ${result.provider}` + (levelLabel ? ` · ${levelLabel}` : '');
       creditRow.appendChild(credit);
 
       frag.appendChild(creditRow);
@@ -723,6 +822,27 @@
     panel.innerHTML = '';
     panel.appendChild(frag);
     activeLineEl = null;
+    anchorLineEl = null;
+
+    // New song -> start at the top. The scroll container keeps the previous
+    // song's scroll offset (we were parked at the last line + credit row), so
+    // without this the next song's lyrics appeared scrolled to the bottom until
+    // the first line was sung and scrollIntoView() pulled them into place.
+    // Keyed on the lyrics identity so a mere re-render (font/animation change,
+    // offset panel toggle) mid-song doesn't jump back to the top.
+    const renderKey = [result.provider || '', result.mode || '', result.lines.length,
+      result.lines[0]?.text ?? '', result.lines[result.lines.length - 1]?.text ?? ''].join('|');
+    if (renderKey !== lastRenderedKey) {
+      lastRenderedKey = renderKey;
+      const h = findTabContentHost();
+      [h, panel, panel.parentElement].forEach((el) => {
+        if (!el) return;
+        const prev = el.style.scrollBehavior;
+        el.style.scrollBehavior = 'auto'; // instant, not an animated scroll up the whole song
+        el.scrollTop = 0;
+        el.style.scrollBehavior = prev;
+      });
+    }
     updateEdgeFade(findTabContentHost());
   }
 
@@ -772,16 +892,23 @@
       activeLineEl?.querySelectorAll('.vivi-lyrics-word').forEach((w) => {
         w.dataset.fillState = 'sung';
         w.classList.add('vivi-lyrics-word-sung');
-        w.classList.remove('vivi-lyrics-word-glowing', 'vivi-lyrics-word-bouncing');
+        w.classList.remove('vivi-lyrics-word-glowing', 'vivi-lyrics-word-bouncing', 'vivi-lyrics-syl-swell');
         w.style.transitionDuration = '0s';
         w.style.backgroundPosition = '0% 0';
       });
+      activeLineEl?.querySelectorAll('.vivi-lyrics-wordgroup').forEach((g) => {
+        g.dataset.gState = 'sung';
+        g.classList.remove('vivi-lyrics-wordgroup-active');
+        g.classList.add('vivi-lyrics-wordgroup-sung');
+      });
       active?.classList.add('vivi-lyrics-active');
       activeLineEl = active;
+      if (active) anchorLineEl = active;
+      updateLineDistances();
       active?.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }
 
-    if (currentResult.mode === 'word' && active) {
+    if ((currentResult.mode === 'word' || currentResult.mode === 'syllable') && active) {
       const words = active.querySelectorAll('.vivi-lyrics-word');
       words.forEach((w) => {
         const ws = Number(w.dataset.start);
@@ -797,6 +924,19 @@
         if (w.dataset.fillState === state) return;
         w.dataset.fillState = state;
         w.classList.toggle('vivi-lyrics-word-sung', state === 'sung');
+
+        // Long-held syllables slowly swell while they're being sung.
+        if (w.classList.contains('vivi-lyrics-syl')) {
+          const held = we - ws;
+          if (state === 'active' && held >= 900 && settings.lyricsAnimationStyle !== 'bounce') {
+            w.style.setProperty('--vivi-dur', held + 'ms');
+            w.classList.remove('vivi-lyrics-syl-swell');
+            void w.offsetWidth;
+            w.classList.add('vivi-lyrics-syl-swell');
+          } else {
+            w.classList.remove('vivi-lyrics-syl-swell');
+          }
+        }
 
         if (settings.lyricsAnimationStyle === 'glow') {
           // Glow-up: instead of a sweeping gradient fill, the word snaps to
@@ -843,6 +983,20 @@
           w.style.backgroundPosition = '100% 0';
         }
       });
+
+      // Syllable mode: lift the word currently being sung (and settle it
+      // once finished), the way Better Lyrics / Apple Music do.
+      if (currentResult.mode === 'syllable') {
+        active.querySelectorAll('.vivi-lyrics-wordgroup').forEach((g) => {
+          const gs = Number(g.dataset.start);
+          const ge = Number(g.dataset.end);
+          const st = nowMs >= ge ? 'sung' : nowMs >= gs ? 'active' : 'upcoming';
+          if (g.dataset.gState === st) return;
+          g.dataset.gState = st;
+          g.classList.toggle('vivi-lyrics-wordgroup-active', st === 'active');
+          g.classList.toggle('vivi-lyrics-wordgroup-sung', st === 'sung');
+        });
+      }
     }
   }
 
@@ -908,6 +1062,8 @@
   async function runLyricsFetch(trackWithDuration, key, { keepOffsetPanelOpen }) {
     const excludeKeys = await loadExcludedProviders(trackWithDuration);
     if (key !== currentTrackKey) return; // track changed again while awaiting the exclusion lookup
+    // Nothing is shown until the provider check settles: after the first
+    // reply there is at most a 1s window in which the best sync level wins.
     const result = await window.__viviLyrics.fetchBestLyrics(trackWithDuration, { excludeKeys });
     if (key !== currentTrackKey) return; // track changed again while fetching
 

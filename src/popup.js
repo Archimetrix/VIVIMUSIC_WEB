@@ -9,6 +9,7 @@
   const kwWarpIntensity = document.getElementById('kwWarpIntensity');
   const kwBlurPasses = document.getElementById('kwBlurPasses');
   const kwSaturation = document.getElementById('kwSaturation');
+  const kwBrightness = document.getElementById('kwBrightness');
   const kwDithering = document.getElementById('kwDithering');
   const kwAnimationSpeed = document.getElementById('kwAnimationSpeed');
   const kwTransitionDuration = document.getElementById('kwTransitionDuration');
@@ -20,6 +21,11 @@
   const dancerNotFoundToggle = document.getElementById('dancerNotFoundToggle');
   const lyricsAlignSelect = document.getElementById('lyricsAlignSelect');
   const lyricsAnimSelect = document.getElementById('lyricsAnimSelect');
+  const lyricsFontSelect = document.getElementById('lyricsFontSelect');
+  const lyricsFontPreview = document.getElementById('lyricsFontPreview');
+  function showLyricsFontPreview(id) {
+    lyricsFontPreview.className = id && id !== 'default' ? 'vivi-lyrics-font-' + id : '';
+  }
   const sponsorBlockToggle = document.getElementById('sponsorBlockToggle');
   const statusDot    = document.getElementById('statusDot');
   const statusText   = document.getElementById('statusText');
@@ -42,9 +48,11 @@
   }
 
   const DEFAULT_PROVIDERS = {
+    lrcred: true,
     betterlyricsTTML: true,
     betterlyricsKugou: true,
     betterlyricsLegacy: true,
+    betterlyricsPortato: true,
     lrclib: true,
     musixmatch: true,
     unison: true,
@@ -54,16 +62,16 @@
   const PROVIDER_KEYS = Object.keys(DEFAULT_PROVIDERS);
 
   // Provider display names for the priority dropdowns — deliberately
-  // excludes Spotify, which is never raced (it's a sequential fallback
+  // lists ONLY syllable/word-synced providers (line-only ones can't be a top-3
+  // pick) and excludes Spotify, which is never raced (it's a sequential fallback
   // tried only when nothing else has anything, same with priority on or off).
   const PRIORITY_PROVIDER_LABELS = {
-    betterlyricsTTML: 'BetterLyrics (word-sync)',
-    betterlyricsKugou: 'BetterLyrics (Kugou)',
-    betterlyricsLegacy: 'BetterLyrics (Legacy)',
-    lrclib: 'LRCLIB',
-    musixmatch: 'Musixmatch',
-    unison: 'Unison',
-    binilyrics: 'BiniLyrics',
+    lrcred: 'lrc.red (Syllable / Word)',
+    betterlyricsTTML: 'Better Lyrics (Syllable)',
+    unison: 'Better Lyrics Unison (Syllable / Word)',
+    binilyrics: 'BiniLyrics (Syllable)',
+    betterlyricsPortato: 'Better Lyrics Portato (Word)',
+    musixmatch: 'Musixmatch (Word)',
   };
   const PRIORITY_KEYS = Object.keys(PRIORITY_PROVIDER_LABELS);
 
@@ -74,15 +82,16 @@
     kawarpWarpIntensity: 1.0,
     kawarpBlurPasses: 5,
     kawarpSaturation: 2.6,
+    kawarpBrightness: 0.5,
     kawarpDithering: 0.034,
     kawarpAnimationSpeed: 4.15,
     kawarpTransitionDuration: 0,
   };
 
   chrome.storage.local.get(
-    { enabled: true, themeEnabled: true, imageOnlyMode: false, kawarpEnabled: true, eqEnabled: true, lyricsEnabled: true, autoSwitchLyrics: true, sponsorBlockEnabled: true, lyricsShowForVideos: true, dancerOnNotFound: true, lyricsAlign: 'left', lyricsAnimationStyle: 'fill', lyricsProviders: DEFAULT_PROVIDERS, ...KAWARP_DEFAULTS },
-    ({ enabled, themeEnabled, imageOnlyMode, kawarpEnabled, eqEnabled, lyricsEnabled, autoSwitchLyrics, sponsorBlockEnabled, lyricsShowForVideos, dancerOnNotFound, lyricsAlign, lyricsAnimationStyle, lyricsProviders,
-       kawarpPauseWhenInactive, kawarpOpacity, kawarpWarpIntensity, kawarpBlurPasses, kawarpSaturation, kawarpDithering, kawarpAnimationSpeed, kawarpTransitionDuration }) => {
+    { enabled: true, themeEnabled: true, imageOnlyMode: false, kawarpEnabled: true, eqEnabled: true, lyricsEnabled: true, autoSwitchLyrics: true, sponsorBlockEnabled: true, lyricsShowForVideos: false, dancerOnNotFound: true, lyricsAlign: 'center', lyricsAnimationStyle: 'apple', lyricsFont: 'default', lyricsProviders: DEFAULT_PROVIDERS, ...KAWARP_DEFAULTS },
+    ({ enabled, themeEnabled, imageOnlyMode, kawarpEnabled, eqEnabled, lyricsEnabled, autoSwitchLyrics, sponsorBlockEnabled, lyricsShowForVideos, dancerOnNotFound, lyricsAlign, lyricsAnimationStyle, lyricsFont, lyricsProviders,
+       kawarpPauseWhenInactive, kawarpOpacity, kawarpWarpIntensity, kawarpBlurPasses, kawarpSaturation, kawarpBrightness, kawarpDithering, kawarpAnimationSpeed, kawarpTransitionDuration }) => {
       enableToggle.checked = enabled;
       imageOnlyToggle.checked = imageOnlyMode;
       kawarpToggle.checked = kawarpEnabled;
@@ -95,6 +104,11 @@
       dancerNotFoundToggle.checked = dancerOnNotFound;
       lyricsAlignSelect.value = lyricsAlign;
       lyricsAnimSelect.value = lyricsAnimationStyle;
+      if (lyricsAnimSelect.value !== lyricsAnimationStyle) lyricsAnimSelect.value = 'apple';
+      syncAlignLock();
+      lyricsFontSelect.value = lyricsFont;
+      if (lyricsFontSelect.value !== lyricsFont) lyricsFontSelect.value = 'default';
+      showLyricsFontPreview(lyricsFontSelect.value);
       const merged = { ...DEFAULT_PROVIDERS, ...lyricsProviders };
       PROVIDER_KEYS.forEach((k) => {
         const el = document.getElementById('prov-' + k);
@@ -106,6 +120,7 @@
       kwWarpIntensity.value = kawarpWarpIntensity;
       kwBlurPasses.value = kawarpBlurPasses;
       kwSaturation.value = kawarpSaturation;
+      kwBrightness.value = kawarpBrightness;
       kwDithering.value = kawarpDithering;
       kwAnimationSpeed.value = kawarpAnimationSpeed;
       kwTransitionDuration.value = kawarpTransitionDuration;
@@ -179,12 +194,12 @@
   });
 
   chrome.storage.local.get(
-    { lyricsPriorityEnabled: false, lyricsPriorityOrder: [], lyricsPriorityWaitEnabled: true },
+    { lyricsPriorityEnabled: true, lyricsPriorityOrder: ['lrcred', 'binilyrics', 'unison'], lyricsPriorityWaitEnabled: false },
     ({ lyricsPriorityEnabled, lyricsPriorityOrder, lyricsPriorityWaitEnabled }) => {
       priorityEnabledToggle.checked = lyricsPriorityEnabled;
       priorityList.classList.toggle('open', lyricsPriorityEnabled);
-      priorityWaitToggle.checked = lyricsPriorityWaitEnabled !== false;
-      populatePrioritySelects((lyricsPriorityOrder || []).slice(0, PRIORITY_SLOT_COUNT));
+      priorityWaitToggle.checked = lyricsPriorityWaitEnabled === true;
+      populatePrioritySelects((lyricsPriorityOrder || []).filter((k) => PRIORITY_KEYS.includes(k)).slice(0, PRIORITY_SLOT_COUNT));
     }
   );
 
@@ -226,6 +241,7 @@
     document.getElementById('kwWarpIntensityVal').textContent = parseFloat(kwWarpIntensity.value).toFixed(2);
     document.getElementById('kwBlurPassesVal').textContent = kwBlurPasses.value;
     document.getElementById('kwSaturationVal').textContent = parseFloat(kwSaturation.value).toFixed(2);
+    document.getElementById('kwBrightnessVal').textContent = parseFloat(kwBrightness.value).toFixed(2);
     document.getElementById('kwDitheringVal').textContent = parseFloat(kwDithering.value).toFixed(3);
     document.getElementById('kwAnimationSpeedVal').textContent = parseFloat(kwAnimationSpeed.value).toFixed(2);
     document.getElementById('kwTransitionDurationVal').textContent = `${kwTransitionDuration.value}ms`;
@@ -238,6 +254,7 @@
     [kwWarpIntensity, 'kawarpWarpIntensity', parseFloat],
     [kwBlurPasses, 'kawarpBlurPasses', (v) => parseInt(v, 10)],
     [kwSaturation, 'kawarpSaturation', parseFloat],
+    [kwBrightness, 'kawarpBrightness', parseFloat],
     [kwDithering, 'kawarpDithering', parseFloat],
     [kwAnimationSpeed, 'kawarpAnimationSpeed', parseFloat],
     [kwTransitionDuration, 'kawarpTransitionDuration', (v) => parseInt(v, 10)],
@@ -264,6 +281,7 @@
     kwWarpIntensity.value = KAWARP_DEFAULTS.kawarpWarpIntensity;
     kwBlurPasses.value = KAWARP_DEFAULTS.kawarpBlurPasses;
     kwSaturation.value = KAWARP_DEFAULTS.kawarpSaturation;
+    kwBrightness.value = KAWARP_DEFAULTS.kawarpBrightness;
     kwDithering.value = KAWARP_DEFAULTS.kawarpDithering;
     kwAnimationSpeed.value = KAWARP_DEFAULTS.kawarpAnimationSpeed;
     kwTransitionDuration.value = KAWARP_DEFAULTS.kawarpTransitionDuration;
@@ -302,6 +320,15 @@
     relay({ lyricsShowForVideos });
   });
 
+  // Smooth zoom / Apple Music are always left-aligned, so the alignment
+  // picker is locked while either is selected.
+  function syncAlignLock() {
+    const locked = lyricsAnimSelect.value === 'zoom' || lyricsAnimSelect.value === 'apple';
+    lyricsAlignSelect.disabled = locked;
+    lyricsAlignSelect.title = locked ? 'This animation style is always left-aligned' : '';
+    lyricsAlignSelect.style.opacity = locked ? '0.5' : '';
+  }
+
   lyricsAlignSelect.addEventListener('change', () => {
     const lyricsAlign = lyricsAlignSelect.value;
     chrome.storage.local.set({ lyricsAlign });
@@ -310,8 +337,16 @@
 
   lyricsAnimSelect.addEventListener('change', () => {
     const lyricsAnimationStyle = lyricsAnimSelect.value;
+    syncAlignLock();
     chrome.storage.local.set({ lyricsAnimationStyle });
     relay({ lyricsAnimationStyle });
+  });
+
+  lyricsFontSelect.addEventListener('change', () => {
+    const lyricsFont = lyricsFontSelect.value;
+    showLyricsFontPreview(lyricsFont);
+    chrome.storage.local.set({ lyricsFont });
+    relay({ lyricsFont });
   });
 
   dancerNotFoundToggle.addEventListener('change', () => {
@@ -847,6 +882,10 @@
   const lfUsername         = document.getElementById('lastfmUsername');
   const lfPassword         = document.getElementById('lastfmPassword');
   const lfLoginBtn         = document.getElementById('lastfmLoginBtn');
+  const lfLoginForm        = document.getElementById('lastfmLoginForm');
+  const lfWebBtn           = document.getElementById('lastfmWebLoginBtn');
+  const lfWebPending       = document.getElementById('lastfmWebPending');
+  const lfWebCancelBtn     = document.getElementById('lastfmWebCancelBtn');
   const lfLoginError       = document.getElementById('lastfmLoginError');
   const lfLogoutBtn        = document.getElementById('lastfmLogoutBtn');
   const lfNowPlayingToggle = document.getElementById('lastfmNowPlayingToggle');
@@ -912,7 +951,10 @@
     lastfmRelay({ lastfmDelayMinutes });
   });
 
-  lfLoginBtn.addEventListener('click', () => {
+  // A real <form> submit (not a bare button click) is what lets the browser's
+  // password manager recognise this as a login and offer to autofill/save.
+  lfLoginForm.addEventListener('submit', (e) => {
+    e.preventDefault();
     const username = lfUsername.value.trim();
     const password = lfPassword.value;
     if (!username || !password) return;
@@ -927,9 +969,40 @@
         lfLoginError.textContent = resp?.error || "Couldn't connect — check your credentials.";
         return;
       }
-      lfPassword.value = '';
+      // Leave the value briefly so password managers can offer to save it.
+      setTimeout(() => { lfPassword.value = ''; }, 1500);
       refreshLastfmStatus();
     });
+  });
+
+  // Web sign-in: opens last.fm in a normal tab (password managers work there).
+  function showWebPending(on) {
+    lfWebPending.style.display = on ? 'flex' : 'none';
+    lfWebBtn.disabled = !!on;
+    lfWebBtn.textContent = on ? 'Waiting for Last.fm…' : 'Sign in with Last.fm';
+  }
+  chrome.runtime.sendMessage({ type: 'VIVI_LASTFM_WEB_STATUS' }, (resp) => {
+    if (!chrome.runtime.lastError) showWebPending(!!resp?.pending);
+  });
+  lfWebBtn.addEventListener('click', () => {
+    lfLoginError.style.display = 'none';
+    lfWebBtn.disabled = true;
+    lfWebBtn.textContent = 'Opening Last.fm…';
+    chrome.runtime.sendMessage({ type: 'VIVI_LASTFM_WEB_START' }, (resp) => {
+      if (chrome.runtime.lastError || !resp?.ok) {
+        showWebPending(false);
+        lfLoginError.style.display = 'block';
+        lfLoginError.textContent = resp?.error || "Couldn't reach Last.fm — try again.";
+        return;
+      }
+      showWebPending(true);
+    });
+  });
+  lfWebCancelBtn.addEventListener('click', () => {
+    chrome.runtime.sendMessage({ type: 'VIVI_LASTFM_WEB_CANCEL' }, () => showWebPending(false));
+  });
+  chrome.runtime.onMessage.addListener((msg) => {
+    if (msg?.type === 'VIVI_LASTFM_CONNECTED') { showWebPending(false); refreshLastfmStatus(); }
   });
 
   lfLogoutBtn.addEventListener('click', () => {

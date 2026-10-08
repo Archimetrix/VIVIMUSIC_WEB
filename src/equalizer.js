@@ -181,7 +181,7 @@
       applySettingsToGraph();
       return true;
     } catch (e) {
-      console.warn('[ViVi EQ] Failed to set up audio graph:', e?.message);
+      console.debug('[ViVi EQ] Failed to set up audio graph:', e?.message);
       return false;
     }
   }

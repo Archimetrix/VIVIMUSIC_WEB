@@ -92,7 +92,7 @@ async function starGateBackgroundRecheck() {
     // Network hiccup / expired token: leave the stored state as-is. If it's
     // a real expiry, the TTL will lapse on its own and the user re-verifies
     // next time the gate check runs in a tab.
-    console.warn('[ViVi Star Gate] background recheck failed:', e?.message);
+    console.debug('[ViVi Star Gate] background recheck failed:', e?.message);
   }
 }
 

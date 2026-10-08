@@ -84,6 +84,36 @@
     store.appendChild(section);
   });
   header.after(home, settings, announcements, store);
+
+  // ── Update notice ────────────────────────────────────────────────────────
+  // The background worker checks GitHub twice a day and stores the result in
+  // vivi_update_check. If a newer version exists, show a red "1" on the
+  // corner of the Updates card so users know to open it.
+  const updatesCard = home.querySelector('.home-card[data-feature="updates"]');
+  const updateBadge = document.createElement('span');
+  updateBadge.className = 'home-card-badge'; updateBadge.textContent = '1'; updateBadge.hidden = true;
+  updateBadge.setAttribute('aria-label', 'Update available');
+  if (updatesCard) updatesCard.appendChild(updateBadge);
+  function applyUpdateResult(result) {
+    const available = !!(result && result.ok && result.updateAvailable);
+    updateBadge.hidden = !available;
+    if (updatesCard) updatesCard.title = available ? `Update available — v${result.latestVersion}` : '';
+  }
+  try {
+    chrome.storage.local.get('vivi_update_check', ({ vivi_update_check: cached }) => {
+      applyUpdateResult(cached);
+      // Re-check if the stored result is over an hour old.
+      if (!cached || !cached.checkedAt || Date.now() - cached.checkedAt > 60 * 60 * 1000) {
+        try { chrome.runtime.sendMessage({ type: 'VIVI_CHECK_UPDATE' }, (fresh) => { void chrome.runtime.lastError; applyUpdateResult(fresh); }); } catch { /* offline */ }
+      }
+    });
+  } catch { /* storage unavailable */ }
+  // Keep the badge in sync after "Check for updates" in the Updates panel.
+  try {
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area === 'local' && changes.vivi_update_check) applyUpdateResult(changes.vivi_update_check.newValue);
+    });
+  } catch { /* ignore */ }
   const announcementButton = header.querySelector('.announcement-button');
   const announcementBadge = header.querySelector('.announcement-badge');
   let announcementState = { announcements: [], seenIds: [], unreadCount: 0 };

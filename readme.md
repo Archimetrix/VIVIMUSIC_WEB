@@ -7,7 +7,7 @@
 **Apple Music–style Canvas artwork, Spotify Canvas, synced lyrics, Last.fm scrobbling, and a Spotify → YouTube Music playlist transfer tool for YouTube Music.**
 
 [![Manifest](https://img.shields.io/badge/Manifest-V3-ff6b6b?style=flat-square)](#)
-[![Version](https://img.shields.io/badge/Version-9.0-4ecdc4?style=flat-square)](#)
+[![Version](https://img.shields.io/badge/Version-9.1.0-4ecdc4?style=flat-square)](#)
 [![Browsers](https://img.shields.io/badge/Chrome%20%7C%20Edge%20%7C%20Brave%20%7C%20Other%20Chromium%20Browsers-supported-6c5ce7?style=flat-square)](#)
 [![Copyright](https://img.shields.io/badge/Copyright-%C2%A9%202026%20Archimetrix.%20All%20rights%20reserved-f39c12?style=flat-square)](LICENSE)
 </div>
@@ -81,15 +81,16 @@ This extension is **not published on the Chrome Web Store**. It's distributed as
   - Musixmatch
   - Unison
   - BiniLyrics
+  - Lrc.red
 - 📑 **Auto-open Lyrics Tab** — Optionally jumps straight to the Lyrics tab when a track starts.
 - 🎬 **Lyrics on Video Tracks** — Toggle whether the synced lyrics panel also shows up for tracks played as music videos, not just audio-only songs.
 - 🥇 **Lyrics Provider Priority** — Reorder and prioritize which lyrics provider is tried first, with an optional "wait for priority source" toggle before falling back to others.
 - 🎶 **Lyrics Offset** — Adjust the lyrics timeline sync per-track (saved locally).
+- 🔤 **Lyrics Fonts** — Pick a font just for the lyrics lines (Playfair Display, Cormorant, DM Serif Display, Lora, Poppins, Montserrat, Outfit, Space Grotesk, Caveat, Dancing Script, Pacifico, Bebas Neue). Fonts are bundled locally, so no internet is needed, and nothing else on YouTube Music changes.
 - 💃 **REZE Dance** — An animated dancer plays when no lyrics can be found for a track, toggleable in the popup.
 - ⏭️ **Sponsorblock** — Automatically skips non-music segments (intros, sponsor spots, etc.) using Sponsorblock data.
 - 🎧 **Last.fm Scrobbling** — Logs in with your Last.fm username and password and scrobbles what you listen to, sends Now Playing status, and can sync Likes/Unlikes as Loves/Unloves on Last.fm.
 - 💾 **Local Artwork Cache** — Previously fetched artwork/Canvas videos are cached locally so repeat plays load instantly. Viewable and clearable from the popup.
-- 🦁 **Brave Browser Fix Guide** — A built-in walkthrough for resolving Spotify login quirks specific to Brave's shields/cookie handling.
 - 🎨 **THEME** — A full dark, glassy visual reskin of YouTube Music, toggleable independently of Canvas and Lyrics.
 - 🔔 **Update Checker** — Since this isn't on the Web Store, the popup can check this GitHub repo's [Releases](../../releases) page and let you know when a newer version is out. It does not auto-install updates.
 
@@ -145,6 +146,7 @@ All settings live in the extension popup (click the Vivimusic icon in your toolb
 | **Synced Lyrics** | Turns the custom lyrics panel on or off. |
 | **Auto-open Lyrics tab** | Automatically switches to the Lyrics tab when a new track starts. |
 | **Lyrics on video tracks** | Shows the synced lyrics panel for tracks played as music videos, not just audio. |
+| **Lyrics font** | Changes the font of the lyrics lines only. Lyrics in scripts a font doesn't cover (Hindi, Bengali, Korean…) fall back to the default font. |
 | **REZE Dance on no lyrics found** | Plays the animated dancer when no lyrics can be found for a track. |
 | **Sponsorblock** | Automatically skips non-music segments using Sponsorblock data. |
 | **Lyrics providers** | Toggle individual lyrics sources on/off, in priority order. |

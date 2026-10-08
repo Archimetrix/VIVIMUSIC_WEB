@@ -4,7 +4,7 @@
 
 'use strict';
 
-importScripts('md5.js', 'lastfm.js', 'spotify.js', 'stargate.js', 'apple-canvas.js');
+importScripts('md5.js', 'lastfm.js', 'spotify.js', 'stargate.js', 'apple-canvas.js', 'lrcred.js');
 
 /* -------------------------------------------------------------------------
  * Apple Music Canvas — header spoofing
@@ -42,7 +42,7 @@ async function ensureAmpHeaderSpoofRule() {
       }],
     });
   } catch (e) {
-    console.warn('[Vivi] Could not register AMP header-spoof rule:', e.message);
+    console.debug('[Vivi] Could not register AMP header-spoof rule:', e.message);
   }
 }
 
@@ -148,7 +148,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       return false;
     }
     getYtMusicAnnouncements().then(sendResponse).catch(error => {
-      console.warn('[Vivi] YouTube Music announcement fetch failed:', error);
+      console.debug('[Vivi] YouTube Music announcement fetch failed:', error);
       sendResponse({ ok: false, announcements: [] });
     });
     return true;
@@ -219,15 +219,65 @@ async function checkForUpdate() {
   return result;
 }
 
+// One-time lyrics defaults: lrc.red becomes the 1st priority provider
+// (then BiniLyrics, then BetterLyrics word-sync) and every provider is on.
+// Respects existing choices: a user's own order is kept, with lrc.red just
+// slotted in at the top; priority is only switched on for users who never
+// configured an order.
+const DEFAULT_PRIORITY_ORDER = ['lrcred', 'binilyrics', 'unison'];
+async function migrateLyricsDefaults() {
+  // "Show lyrics for video songs" now defaults to off — applied once.
+  const v = await chrome.storage.local.get({ vivi_video_lyrics_default_off: false });
+  if (!v.vivi_video_lyrics_default_off) {
+    await chrome.storage.local.set({ lyricsShowForVideos: false, vivi_video_lyrics_default_off: true });
+  }
+  // "Wait 2s for higher-priority provider" now defaults to off — applied once.
+  const w = await chrome.storage.local.get({ vivi_wait_default_off: false });
+  if (!w.vivi_wait_default_off) {
+    await chrome.storage.local.set({ lyricsPriorityWaitEnabled: false, vivi_wait_default_off: true });
+  }
+  // Top-3 priority is syllable/word providers only — strip any line-only
+  // provider (Legato/Kugou, Legacy, LRCLIB) a user had
+  // previously picked. Applied once.
+  const sy = await chrome.storage.local.get({ vivi_priority_syllable_word_only: false, lyricsPriorityOrder: [] });
+  if (!sy.vivi_priority_syllable_word_only) {
+    const ok = ['lrcred', 'betterlyricsTTML', 'betterlyricsPortato', 'unison', 'binilyrics', 'musixmatch'];
+    const cleaned = (Array.isArray(sy.lyricsPriorityOrder) ? sy.lyricsPriorityOrder : [])
+      .filter((k, i, a) => ok.includes(k) && a.indexOf(k) === i).slice(0, 3);
+    await chrome.storage.local.set({ lyricsPriorityOrder: cleaned, vivi_priority_syllable_word_only: true });
+  }
+  const s = await chrome.storage.local.get({
+    vivi_lyrics_defaults_lrcred: false,
+    lyricsProviders: {},
+    lyricsPriorityEnabled: false,
+    lyricsPriorityOrder: [],
+  });
+  if (s.vivi_lyrics_defaults_lrcred) return;
+  const existing = (Array.isArray(s.lyricsPriorityOrder) ? s.lyricsPriorityOrder : []).filter(Boolean);
+  const patch = {
+    vivi_lyrics_defaults_lrcred: true,
+    lyricsProviders: { ...s.lyricsProviders, lrcred: true },
+  };
+  if (!existing.length) {
+    patch.lyricsPriorityOrder = DEFAULT_PRIORITY_ORDER.slice();
+    patch.lyricsPriorityEnabled = true;
+  } else if (!existing.includes('lrcred')) {
+    patch.lyricsPriorityOrder = ['lrcred', ...existing].slice(0, 3);
+  }
+  await chrome.storage.local.set(patch);
+}
+
 chrome.runtime.onInstalled.addListener(() => {
   chrome.alarms.create(ALARM_NAME, { periodInMinutes: CHECK_INTERVAL_MIN });
   checkForUpdate();
   ensureAmpHeaderSpoofRule();
+  migrateLyricsDefaults().catch(() => {});
 });
 
 chrome.runtime.onStartup.addListener(() => {
   checkForUpdate();
   ensureAmpHeaderSpoofRule();
+  migrateLyricsDefaults().catch(() => {});
 });
 
 // Service workers get evicted after ~30s idle and restart on the next event —
@@ -290,6 +340,80 @@ async function handleLastfmScrobble(track, timestamp) {
     return { ok: false, error: e.message };
   }
 }
+
+/* ---- Last.fm web sign-in (opens last.fm in a normal tab) ---- */
+const LASTFM_WEB_PENDING_KEY = 'vivi_lastfm_pending';
+const LASTFM_WEB_ALARM = 'vivi-lastfm-web-auth';
+const LASTFM_WEB_TIMEOUT_MS = 10 * 60 * 1000;
+let lastfmWebPolling = false;
+
+async function lastfmWebClear() {
+  await chrome.storage.local.remove(LASTFM_WEB_PENDING_KEY);
+  try { await chrome.alarms.clear(LASTFM_WEB_ALARM); } catch { /* ignore */ }
+}
+
+async function lastfmWebStart() {
+  try {
+    const token = await lastfmGetToken();
+    if (!token) throw new Error('Last.fm did not return a token.');
+    const url = `https://www.last.fm/api/auth/?api_key=${encodeURIComponent(LASTFM_API_KEY)}&token=${encodeURIComponent(token)}`;
+    const tab = await chrome.tabs.create({ url });
+    await chrome.storage.local.set({
+      [LASTFM_WEB_PENDING_KEY]: { token, tabId: tab.id, startedAt: Date.now() },
+    });
+    chrome.alarms.create(LASTFM_WEB_ALARM, { periodInMinutes: 0.5 });
+    lastfmWebPoll();
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+// -> 'none' | 'pending' | 'expired' | 'done'
+async function lastfmWebTryFinish() {
+  const saved = await chrome.storage.local.get(LASTFM_WEB_PENDING_KEY);
+  const pending = saved[LASTFM_WEB_PENDING_KEY];
+  if (!pending) return 'none';
+  if (Date.now() - pending.startedAt > LASTFM_WEB_TIMEOUT_MS) {
+    await lastfmWebClear();
+    return 'expired';
+  }
+  try {
+    const { sessionKey, username } = await lastfmGetSessionFromToken(pending.token);
+    await chrome.storage.local.set({ lastfmSession: { sessionKey, username } });
+    await lastfmWebClear();
+    chrome.runtime.sendMessage({ type: 'VIVI_LASTFM_CONNECTED', username }).catch(() => {});
+    return 'done';
+  } catch (e) {
+    if (e.lastfmCode === 15) { await lastfmWebClear(); return 'expired'; }
+    return 'pending'; // 14 (not approved yet) or a network hiccup — keep waiting
+  }
+}
+
+async function lastfmWebPoll() {
+  if (lastfmWebPolling) return;
+  lastfmWebPolling = true;
+  try {
+    for (let i = 0; i < 150; i++) { // ~5 minutes at 2s
+      if ((await lastfmWebTryFinish()) !== 'pending') break;
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+  } finally {
+    lastfmWebPolling = false;
+  }
+}
+
+// The service worker can be evicted while the user is on last.fm, so also
+// resume on the alarm and whenever the sign-in tab changes or closes.
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === LASTFM_WEB_ALARM) lastfmWebPoll();
+});
+async function lastfmWebOnTabEvent(tabId) {
+  const saved = await chrome.storage.local.get(LASTFM_WEB_PENDING_KEY);
+  if (saved[LASTFM_WEB_PENDING_KEY]?.tabId === tabId) lastfmWebPoll();
+}
+chrome.tabs.onUpdated.addListener((tabId, info) => { if (info.status === 'complete') lastfmWebOnTabEvent(tabId); });
+chrome.tabs.onRemoved.addListener((tabId) => { lastfmWebOnTabEvent(tabId); });
 
 async function handleLastfmLove(track, loved) {
   const session = await lastfmGetSession();
@@ -369,6 +493,15 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 
     case 'VIVI_LASTFM_LOGIN':
       handleLastfmLogin(msg.username, msg.password).then(sendResponse);
+      return true;
+    case 'VIVI_LASTFM_WEB_START':
+      lastfmWebStart().then(sendResponse);
+      return true;
+    case 'VIVI_LASTFM_WEB_CANCEL':
+      lastfmWebClear().then(() => sendResponse({ ok: true }));
+      return true;
+    case 'VIVI_LASTFM_WEB_STATUS':
+      chrome.storage.local.get(LASTFM_WEB_PENDING_KEY).then((v) => sendResponse({ pending: !!v[LASTFM_WEB_PENDING_KEY] }));
       return true;
     case 'VIVI_LASTFM_LOGOUT':
       handleLastfmLogout().then(sendResponse);

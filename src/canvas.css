@@ -207,6 +207,63 @@ ytmusic-player .vivi-canvas-slot {
   margin-right: 0;
 }
 
+/* ── Syllable-level sync ───────────────────────────────────────────────────
+   A word is a .vivi-lyrics-wordgroup (spacing + lift); each syllable inside
+   it is a .vivi-lyrics-word.vivi-lyrics-syl, so all the existing fill / glow /
+   bounce logic animates per syllable with no extra code paths. */
+.vivi-lyrics-wordgroup {
+  display: inline-block;
+  margin-right: 0.28em;
+  white-space: pre;
+  transition: transform 0.4s cubic-bezier(0.22, 0.8, 0.24, 1), filter 0.4s ease;
+}
+.vivi-lyrics-wordgroup:last-child,
+.vivi-lyrics-wordgroup.vivi-lyrics-wordgroup-joined { margin-right: 0; }
+
+/* Syllables sit flush inside their word. */
+.vivi-lyrics-word.vivi-lyrics-syl { margin-right: 0; white-space: pre; }
+
+/* CJK / glued tokens: no gap after the unit. */
+.vivi-lyrics-word.vivi-lyrics-word-joined { margin-right: 0; }
+
+/* Soft-edged karaoke sweep: the fill edge is feathered over half a syllable
+   (250%-wide gradient; position 100% = unsung, 0% = fully sung). */
+.vivi-lyrics-word.vivi-lyrics-syl {
+  background-image: linear-gradient(
+    90deg,
+    var(--text-primary, #fff) 0%,
+    var(--text-primary, #fff) 40%,
+    var(--text-secondary, rgba(255,255,255,0.45)) 60%,
+    var(--text-secondary, rgba(255,255,255,0.45)) 100%
+  );
+  background-size: 250% 100%;
+}
+
+/* Backing vocals: smaller and softer. */
+.vivi-lyrics-wordgroup-bg,
+.vivi-lyrics-word.vivi-lyrics-word-bg { font-size: 0.72em; font-style: italic; opacity: 0.85; }
+
+/* The word being sung lifts slightly and gets a faint halo. */
+.vivi-lyrics-line.vivi-lyrics-active .vivi-lyrics-wordgroup-active {
+  transform: translateY(-2px);
+  filter: drop-shadow(0 0 7px rgba(255, 255, 255, 0.28));
+}
+
+/* Long-held syllables swell while sung, then settle by the time they end. */
+@keyframes vivi-syl-swell {
+  0%   { transform: scale(1); }
+  60%  { transform: scale(1.07); }
+  100% { transform: scale(1); }
+}
+.vivi-lyrics-word.vivi-lyrics-syl-swell {
+  transform-origin: 50% 75%;
+  animation: vivi-syl-swell var(--vivi-dur, 1s) ease-in-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .vivi-lyrics-line.vivi-lyrics-active .vivi-lyrics-wordgroup-active { transform: none; }
+  .vivi-lyrics-word.vivi-lyrics-syl-swell { animation: none; }
+}
+
 /* Words not yet reached in the currently active line start fully unfilled. */
 .vivi-lyrics-line.vivi-lyrics-active .vivi-lyrics-word {
   background-position: 100% 0;
@@ -275,6 +332,52 @@ ytmusic-player .vivi-canvas-slot {
 .vivi-lyrics-list.vivi-lyrics-anim-bounce .vivi-lyrics-word-bouncing {
   color: var(--text-primary, #fff);
   animation: vivi-word-bounce 0.32s cubic-bezier(.34, 1.56, .64, 1);
+}
+
+/* ── Smooth zoom ───────────────────────────────────────────────────────────
+   Always left-aligned. Every line is laid out at the same (large) size and
+   the inactive ones are scaled down, so the active line "zooms" in without
+   re-wrapping text or shifting the layout. */
+.vivi-lyrics-list.vivi-lyrics-anim-zoom { gap: 26px; align-items: flex-start; text-align: left; }
+.vivi-lyrics-list.vivi-lyrics-anim-zoom .vivi-lyrics-line {
+  font-size: 36px;
+  line-height: 1.3;
+  opacity: 0.4;
+  transform: scale(0.7);
+  transform-origin: left center;
+  transition: color 0.45s ease, opacity 0.45s ease, transform 0.55s cubic-bezier(0.22, 0.8, 0.24, 1);
+}
+.vivi-lyrics-list.vivi-lyrics-anim-zoom .vivi-lyrics-line.vivi-lyrics-active {
+  font-size: 36px;
+  opacity: 1;
+  transform: scale(1);
+}
+.vivi-lyrics-list.vivi-lyrics-anim-zoom .vivi-lyrics-line.vivi-lyrics-clickable:hover { opacity: 0.75; }
+
+/* ── Apple Music ───────────────────────────────────────────────────────────
+   Always left-aligned. Big heavy lines; everything except the active line is
+   dimmed and blurred, more the further away it is (--vivi-d set from JS). */
+.vivi-lyrics-list.vivi-lyrics-anim-apple { gap: 18px; align-items: flex-start; text-align: left; }
+.vivi-lyrics-list.vivi-lyrics-anim-apple .vivi-lyrics-line {
+  font-size: 40px;
+  font-weight: 800;
+  line-height: 1.25;
+  opacity: 0.5;
+  transform: scale(0.94);
+  transform-origin: left center;
+  filter: blur(calc(var(--vivi-d, 1) * 1.1px));
+  transition: color 0.4s ease, opacity 0.4s ease, filter 0.5s cubic-bezier(0.22, 0.8, 0.24, 1), transform 0.5s cubic-bezier(0.22, 0.8, 0.24, 1);
+  will-change: filter, transform, opacity;
+}
+.vivi-lyrics-list.vivi-lyrics-anim-apple .vivi-lyrics-line.vivi-lyrics-active {
+  font-size: 40px;
+  opacity: 1;
+  transform: scale(1);
+  filter: blur(0);
+}
+.vivi-lyrics-list.vivi-lyrics-anim-apple .vivi-lyrics-line.vivi-lyrics-clickable:hover {
+  opacity: 0.85;
+  filter: blur(0);
 }
 
 .vivi-lyrics-credit-row {
@@ -820,4 +923,30 @@ ytmusic-logo picture {
   width: auto;
   max-width: none;
   object-fit: contain;
+}
+
+/* ── Glyph overhang fix (handwritten / script lyric fonts) ──────────────────
+   Each word/syllable is an inline-block painted with background-clip:text, so
+   the fill can only show inside the span's box. Script fonts (Caveat, Dancing
+   Script, Pacifico...) have ink that spills past the glyph advance box -- the
+   tail of a "d", the crossbar of a "t", swashes on "y"/"f"/"g" -- and that
+   overhang was being clipped off ("learned" -> "learnea").
+   Fix: give the span extra padding so the box covers the ink, and cancel it
+   with an equal negative margin so line layout/spacing doesn't change. */
+.vivi-lyrics-list { --vivi-ink-x: 0.08em; --vivi-ink-y: 0.1em; }
+.vivi-lyrics-list.vivi-lyrics-font-caveat,
+.vivi-lyrics-list.vivi-lyrics-font-dancing,
+.vivi-lyrics-list.vivi-lyrics-font-pacifico { --vivi-ink-x: 0.22em; --vivi-ink-y: 0.22em; }
+
+.vivi-lyrics-list .vivi-lyrics-word {
+  padding: var(--vivi-ink-y) var(--vivi-ink-x);
+  margin-top: calc(-1 * var(--vivi-ink-y));
+  margin-bottom: calc(-1 * var(--vivi-ink-y));
+  margin-left: calc(-1 * var(--vivi-ink-x));
+  margin-right: calc(0.28em - var(--vivi-ink-x));
+}
+.vivi-lyrics-list .vivi-lyrics-word:last-child,
+.vivi-lyrics-list .vivi-lyrics-word.vivi-lyrics-word-joined,
+.vivi-lyrics-list .vivi-lyrics-word.vivi-lyrics-syl {
+  margin-right: calc(-1 * var(--vivi-ink-x));
 }

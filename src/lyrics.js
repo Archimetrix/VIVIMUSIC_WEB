@@ -5,8 +5,11 @@
 (() => {
   'use strict';
 
-  const BETTERLYRICS_BASE = 'https://lyrics-api.boidu.dev';
-  const UNISON_BASE       = 'https://unison.boidu.dev';
+  // Better Lyrics moved to betterlyrics.org; the old boidu.dev hosts are kept
+  // as a fallback that is only tried on a network error / 5xx (never on a
+  // plain "no lyrics" 404, so misses don't cost a second request).
+  const BETTERLYRICS_BASES = ['https://api.betterlyrics.org', 'https://lyrics-api.boidu.dev'];
+  const UNISON_BASES       = ['https://unison.betterlyrics.org', 'https://unison.boidu.dev'];
   const LRCLIB_BASE       = 'https://lrclib.net/api';
   // BiniLyrics — separate word-synced (TTML) catalog, same one used by
   // Better Lyrics upstream and by other YTM lyrics clients. Two-step:
@@ -14,17 +17,22 @@
   // fetched separately to get the actual TTML document.
   const BINILYRICS_BASE   = 'https://lyrics-api.binimum.org';
   const FETCH_TIMEOUT     = 9000;
-  const GRACE_PERIOD_MS   = 500; 
   const PRIORITY_WAIT_MS  = 2000;
+  // Priority OFF: the first reply is shown at once; for this long afterwards
+  // later replies are compared and the best level (syllable > word > line >
+  // plain) replaces it. Never longer than this.
+  const UPGRADE_WINDOW_MS = 1000;
   const DEBUG             = false;
 
   const log = (...a) => DEBUG && console.log('[Vivi:Lyrics]', ...a);
 
   
   const DEFAULT_PROVIDERS = {
+    lrcred: true,
     betterlyricsTTML: true,
     betterlyricsKugou: true,
     betterlyricsLegacy: true,
+    betterlyricsPortato: true,
     lrclib: true,
     musixmatch: true,
     unison: true,
@@ -40,22 +48,31 @@
   // stays a sequential fallback tried only when nothing else has anything,
   // same as before. Capped at 3 entries to keep the UI (and the user's
   // mental model of "pick my top 3") simple.
-  const PRIORITY_ELIGIBLE_KEYS = ['betterlyricsTTML', 'betterlyricsKugou', 'betterlyricsLegacy', 'lrclib', 'musixmatch', 'unison', 'binilyrics'];
-  let priorityEnabled = false;
-  let priorityOrder = [];
+  // Only providers that can deliver syllable- or word-level sync may be put
+  // in the top-3 priority list (line-only sources — Legato/Kugou, Legacy,
+  // LRCLIB — are not offered there). A priority provider's
+  // reply is shown whatever level it turns out to be, even line-synced.
+  const PRIORITY_ELIGIBLE_KEYS = ['lrcred', 'betterlyricsTTML', 'betterlyricsPortato', 'unison', 'binilyrics', 'musixmatch'];
+  const sanitizeOrder = (arr) => (Array.isArray(arr) ? arr : [])
+    .filter((k, i, a) => PRIORITY_ELIGIBLE_KEYS.includes(k) && a.indexOf(k) === i)
+    .slice(0, 3);
+  // Defaults: lrc.red first, then BiniLyrics, then BetterLyrics (word-sync).
+  const DEFAULT_PRIORITY_ORDER = ['lrcred', 'binilyrics', 'unison'];
+  let priorityEnabled = true;
+  let priorityOrder = DEFAULT_PRIORITY_ORDER.slice();
   // When true, a lower-priority reply waits up to PRIORITY_WAIT_MS to see if
   // a higher-priority provider is about to answer too, before committing.
   // When false, whichever of the (up to 3) priority providers answers first
   // wins outright, with no wait.
-  let priorityWaitEnabled = true;
+  let priorityWaitEnabled = false;
 
   chrome.storage.local.get(
-    { lyricsProviders: DEFAULT_PROVIDERS, lyricsPriorityEnabled: false, lyricsPriorityOrder: [], lyricsPriorityWaitEnabled: true },
+    { lyricsProviders: DEFAULT_PROVIDERS, lyricsPriorityEnabled: true, lyricsPriorityOrder: DEFAULT_PRIORITY_ORDER, lyricsPriorityWaitEnabled: false },
     (s) => {
       providerSettings = { ...DEFAULT_PROVIDERS, ...s.lyricsProviders };
       priorityEnabled = !!s.lyricsPriorityEnabled;
-      priorityOrder = Array.isArray(s.lyricsPriorityOrder) ? s.lyricsPriorityOrder.slice(0, 3) : [];
-      priorityWaitEnabled = s.lyricsPriorityWaitEnabled !== false;
+      priorityOrder = sanitizeOrder(s.lyricsPriorityOrder);
+      priorityWaitEnabled = s.lyricsPriorityWaitEnabled === true;
     }
   );
 
@@ -63,8 +80,8 @@
     if (msg.type !== 'VIVI_SETTINGS') return;
     if (msg.lyricsProviders) providerSettings = { ...providerSettings, ...msg.lyricsProviders };
     if ('lyricsPriorityEnabled' in msg) priorityEnabled = !!msg.lyricsPriorityEnabled;
-    if ('lyricsPriorityOrder' in msg) priorityOrder = Array.isArray(msg.lyricsPriorityOrder) ? msg.lyricsPriorityOrder.slice(0, 3) : [];
-    if ('lyricsPriorityWaitEnabled' in msg) priorityWaitEnabled = msg.lyricsPriorityWaitEnabled !== false;
+    if ('lyricsPriorityOrder' in msg) priorityOrder = sanitizeOrder(msg.lyricsPriorityOrder);
+    if ('lyricsPriorityWaitEnabled' in msg) priorityWaitEnabled = msg.lyricsPriorityWaitEnabled === true;
   });
 
   
@@ -86,6 +103,37 @@
     }
   }
 
+  // Tries each base in order; moves on to the next only on a network error,
+  // timeout or 5xx — a clean 404/401 ("no lyrics") is a real answer.
+  async function fetchJsonFromBases(bases, path, qs) {
+    for (const base of bases) {
+      try {
+        const res = await withTimeout(fetch(`${base}${path}?${qs}`), FETCH_TIMEOUT);
+        if (res.ok) return await res.json();
+        if (res.status < 500) return null;
+      } catch (e) {
+        log('fetch failed', base, path, e.message);
+      }
+    }
+    return null;
+  }
+
+  function baseQuery(track) {
+    const qs = new URLSearchParams({ s: track.song, a: track.artist || '' });
+    if (track.album) qs.set('al', track.album);
+    if (track.duration) qs.set('d', String(Math.round(track.duration)));
+    return qs;
+  }
+
+  function checkTiming(parsed, track, label) {
+    if (!parsed) return null;
+    if (!isTimingPlausible(parsed, track)) {
+      log(label + ' result rejected: timing does not match track duration');
+      return null;
+    }
+    return parsed;
+  }
+
   async function safeFetchText(url, opts) {
     try {
       const res = await withTimeout(fetch(url, opts), FETCH_TIMEOUT);
@@ -100,7 +148,14 @@
   
   function parseTimeToMs(timeStr) {
     if (timeStr == null) return null;
-    const parts = String(timeStr).split(':');
+    const str = String(timeStr).trim();
+    // TTML offset-time ("432.25s", "250ms", "5m")
+    const off = /^(\d+(?:\.\d+)?)(ms|s|m|h)$/.exec(str);
+    if (off) {
+      const n = parseFloat(off[1]);
+      return Math.round(n * { ms: 1, s: 1000, m: 60000, h: 3600000 }[off[2]]);
+    }
+    const parts = str.split(':');
     let seconds = 0;
     if (parts.length === 3) {
       seconds = parseInt(parts[0], 10) * 3600 + parseInt(parts[1], 10) * 60 + parseFloat(parts[2]);
@@ -113,7 +168,6 @@
     return Math.round(seconds * 1000);
   }
 
-  
   function parseLRC(text) {
     if (!text) return null;
     const lineRe = /\[(\d{1,2}:\d{2}(?:\.\d{1,3})?)\]/g;
@@ -137,70 +191,256 @@
     return { mode: 'line', lines };
   }
 
-  
+  // ── Word / syllable model ────────────────────────────────────────────────
+  // Every timed lyric line can carry `words`. Each word is
+  //   { text, start, end, syllables: [{ text, start, end }], joined?, bg? }
+  // `joined` = no space follows this word (CJK text / punctuation glued on),
+  // `bg`     = background / backing vocal.
+  // A result is mode 'syllable' when at least one word is split into several
+  // independently timed syllables, 'word' when the source only times whole
+  // words, 'line' when it only times lines.
+  const CJK_RE = /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af\uff00-\uffef]/;
+
+  // parts: [{ text, start, end, bg? }] — text may carry leading/trailing
+  // whitespace, which is what marks the word boundaries.
+  function buildWordsFromParts(parts) {
+    const words = [];
+    let cur = null;
+    let pendingBreak = true;
+    for (const part of parts) {
+      const raw = String(part.text ?? '');
+      const t = raw.trim();
+      if (/^\s/.test(raw)) pendingBreak = true;
+      if (t === '') { pendingBreak = true; continue; }
+      const prev = cur && cur.syllables[cur.syllables.length - 1];
+      // CJK has no spaces: every character/token is its own word so long
+      // lines can still wrap, but no gap is rendered between them.
+      const cjkBoundary = !pendingBreak && cur && (CJK_RE.test(t[0]) || CJK_RE.test(prev.text.slice(-1)));
+      const bgChange = cur && !!cur.bg !== !!part.bg;
+      if (pendingBreak || !cur || cjkBoundary || bgChange) {
+        if (cur && !pendingBreak) cur.joined = true;
+        cur = { text: '', start: part.start, end: part.end, syllables: [], bg: !!part.bg };
+        words.push(cur);
+      }
+      cur.syllables.push({ text: t, start: part.start, end: part.end });
+      cur.text += t;
+      cur.end = part.end;
+      pendingBreak = /\s$/.test(raw);
+    }
+    return words;
+  }
+
+  // Make sure every syllable has a sane [start, end) (missing / zero-length
+  // ends fall back to the next syllable's start or the line end).
+  function repairTimings(words, lineEnd) {
+    const flat = [];
+    words.forEach((w) => w.syllables.forEach((sy) => flat.push(sy)));
+    for (let i = 0; i < flat.length; i++) {
+      const sy = flat[i];
+      const next = flat[i + 1];
+      if (sy.end == null || !(sy.end > sy.start)) {
+        sy.end = next ? Math.max(next.start, sy.start + 1) : Math.max(lineEnd || 0, sy.start + 300);
+      }
+    }
+    words.forEach((w) => {
+      w.start = w.syllables[0].start;
+      w.end = w.syllables[w.syllables.length - 1].end;
+    });
+  }
+
+  function finalizeResult(lines) {
+    if (!lines.length) return null;
+    let rich = false, split = false;
+    for (const l of lines) {
+      if (l.words && l.words.length) {
+        rich = true;
+        if (l.words.some((w) => w.syllables.length > 1)) split = true;
+      }
+    }
+    return { mode: split ? 'syllable' : rich ? 'word' : 'line', lines };
+  }
+
   function parseTTML(ttmlString) {
     if (!ttmlString) return null;
     let doc;
     try {
-      doc = new DOMParser().parseFromString(ttmlString, 'text/xml');
+      doc = new DOMParser().parseFromString(String(ttmlString).replace(/\\"/g, '"'), 'text/xml');
       if (doc.querySelector('parsererror')) return null;
     } catch {
       return null;
     }
+    const roleOf = (el) => el.getAttribute('ttm:role') || el.getAttribute('role') || '';
     const lines = [];
     doc.querySelectorAll('p').forEach((p) => {
-      const words = [];
-      // `pendingBreak` tracks whether we've seen a real whitespace text node
-      // (or the very start of the line) since the last timed span. Some
-      // word-synced TTML tags syllables individually, e.g.
-      //   <span begin=..>explain</span><span begin=..>ing</span> <span begin=..>myself</span>
-      // "explain"+"ing" have no text node between their tags, so they're
-      // syllables of one word; the space before "myself" marks a real word
-      // boundary. Without this, every timed span becomes its own "word" and
-      // syllables render as visually separate words with a gap between them.
-      let pendingBreak = true;
-      (function collect(el) {
+      const parts = [];
+      (function collect(el, inBg) {
         el.childNodes.forEach((node) => {
           if (node.nodeType === 3) {
-            if (/\s/.test(node.textContent)) pendingBreak = true;
+            // Whitespace-only text between timed spans = a word boundary.
+            if (/\s/.test(node.textContent) && parts.length) {
+              const last = parts[parts.length - 1];
+              if (!/\s$/.test(last.text)) last.text += ' ';
+            }
             return;
           }
-          if (node.nodeType === 1 && node.tagName.toLowerCase() === 'span') {
-            const begin = node.getAttribute('begin');
-            if (begin) {
-              const start = parseTimeToMs(begin);
-              const end = parseTimeToMs(node.getAttribute('end'));
-              const text = node.textContent;
-              if (!pendingBreak && words.length > 0) {
-                // Syllable continuation of the previous word: merge instead
-                // of pushing a new "word" entry.
-                const prev = words[words.length - 1];
-                prev.text += text;
-                prev.end = end;
-              } else {
-                words.push({ text, start, end });
-              }
-              // A trailing space embedded in the span's own text also counts
-              // as a break for whatever comes next.
-              pendingBreak = /\s$/.test(text);
-            } else {
-              collect(node);
-            }
+          if (node.nodeType !== 1 || node.tagName.toLowerCase() !== 'span') return;
+          const role = roleOf(node);
+          if (role === 'x-translation' || role === 'x-roman') return;
+          const bg = inBg || role === 'x-bg';
+          const begin = node.getAttribute('begin');
+          const hasChildSpans = node.querySelector('span[begin]');
+          if (begin && !hasChildSpans) {
+            parts.push({
+              text: node.textContent,
+              start: parseTimeToMs(begin),
+              end: parseTimeToMs(node.getAttribute('end')),
+              bg,
+            });
+          } else {
+            collect(node, bg);
           }
         });
-      })(p);
-      if (words.length === 0) return;
-      const begin = p.getAttribute('begin');
-      const end = p.getAttribute('end');
+      })(p, false);
+
+      const pBegin = p.getAttribute('begin');
+      const pEnd = p.getAttribute('end');
+      const lineStartAttr = pBegin ? parseTimeToMs(pBegin) : null;
+      const lineEndAttr = pEnd ? parseTimeToMs(pEnd) : null;
+      const usable = parts.filter((x) => x.start != null);
+
+      if (usable.length === 0) {
+        // Line-timed TTML: no timed spans, just the <p> text.
+        const text = (p.textContent || '').replace(/\s+/g, ' ').trim();
+        if (!text || lineStartAttr == null) return;
+        lines.push({ start: lineStartAttr, end: lineEndAttr ?? lineStartAttr + 5000, text });
+        return;
+      }
+      const words = buildWordsFromParts(usable);
+      if (!words.length) return;
+      const start = lineStartAttr ?? words[0].start;
+      repairTimings(words, lineEndAttr ?? words[words.length - 1].end);
+      const lastEnd = Math.max(...words.map((w) => w.end));
+      const end = Math.max(lineEndAttr ?? lastEnd, lastEnd);
       lines.push({
-        start: begin ? parseTimeToMs(begin) : words[0].start,
-        end: end ? parseTimeToMs(end) : words[words.length - 1].end,
+        start: Math.min(start, words[0].start),
+        end,
         words,
-        text: words.map((w) => w.text).join('').trim(),
+        text: words.map((w) => w.text + (w.joined ? '' : ' ')).join('').trim(),
       });
     });
     if (lines.length === 0) return null;
-    return { mode: 'word', lines };
+    lines.sort((a, b) => a.start - b.start);
+    return finalizeResult(lines);
+  }
+
+  // Enhanced LRC — "[mm:ss.xx]<mm:ss.xx>word <mm:ss.xx>word <mm:ss.xx>" — the
+  // word-level format Unison / lrc.red / Musixmatch-derived sources use.
+  function parseEnhancedLRC(text) {
+    if (!text || !/<\d{1,2}:\d{2}(?:\.\d{1,3})?>/.test(text)) return null;
+    const lineTag = /^\s*\[(\d{1,2}:\d{2}(?:\.\d{1,3})?)\]/;
+    const wordTag = /<(\d{1,2}:\d{2}(?:\.\d{1,3})?)>/g;
+    const raw = [];
+    for (const row of text.split(/\r?\n/)) {
+      const m = lineTag.exec(row);
+      if (!m) continue;
+      const lineStart = parseTimeToMs(m[1]);
+      const body = row.slice(m[0].length);
+      const segs = [];
+      let last = 0, curT = null;
+      for (const t of body.matchAll(wordTag)) {
+        const chunk = body.slice(last, t.index);
+        if (curT !== null && chunk !== '') segs.push({ text: chunk, start: curT, end: parseTimeToMs(t[1]) });
+        else if (curT === null && chunk.trim() !== '') segs.push({ text: chunk, start: lineStart, end: parseTimeToMs(t[1]) });
+        curT = parseTimeToMs(t[1]);
+        last = t.index + t[0].length;
+      }
+      const tail = body.slice(last);
+      if (tail.trim() !== '' && curT !== null) segs.push({ text: tail, start: curT, end: null });
+      raw.push({ start: lineStart, segs, plain: body.replace(wordTag, '').trim() });
+    }
+    raw.sort((a, b) => a.start - b.start);
+    const lines = [];
+    raw.forEach((r, i) => {
+      const nextStart = i < raw.length - 1 ? raw[i + 1].start : r.start + 8000;
+      if (!r.segs.length) {
+        if (r.plain) lines.push({ start: r.start, end: nextStart, text: r.plain });
+        return;
+      }
+      const words = buildWordsFromParts(r.segs);
+      if (!words.length) return;
+      repairTimings(words, nextStart);
+      lines.push({
+        start: r.start,
+        end: Math.max(nextStart, words[words.length - 1].end),
+        words,
+        text: words.map((w) => w.text + (w.joined ? '' : ' ')).join('').trim(),
+      });
+    });
+    return finalizeResult(lines);
+  }
+
+  // QRC (QQ Music, "Better Lyrics Portato"): "[lineStart,lineDur]text(start,dur)text(start,dur)".
+  // The body lives in a LyricContent="…" XML attribute.
+  const QRC_CREDIT_RE = /^(作词|作曲|词|曲|编曲|制作人|混音|录音|母带|监制|和声|吉他|贝斯|鼓|OP|SP|(?:Lyrics?|Written|Composed|Composer|Produced|Producer|Arranged|Arranger|Mixed|Mastered|Recorded|Publisher|Published)(?:\s+by)?)\s*[:：]/i;
+  function parseQRC(raw, durationMs, meta) {
+    if (!raw) return null;
+    let body = String(raw);
+    const m = /LyricContent="([\s\S]*?)"\s*(?:\/?>|[a-zA-Z]+=)/.exec(body);
+    if (m) {
+      body = m[1].replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+    }
+    const norm = (x) => String(x || '').toLowerCase().replace(/[^a-z0-9\u3040-\u9fff\uac00-\ud7af]/g, '');
+    const nt = norm(meta?.title), na = norm(meta?.artist);
+    const rows = [];
+    for (const rawRow of body.split(/\r?\n/)) {
+      const row = rawRow.trim();
+      if (!row || /^\[[a-zA-Z]+:/.test(row)) continue;
+      const h = /^\[(\d+),(\d+)\]/.exec(row);
+      if (!h) continue;
+      const rest = row.slice(h[0].length);
+      const parts = [];
+      let last = 0;
+      for (const t of rest.matchAll(/\((\d+),(\d+)\)/g)) {
+        const text = rest.slice(last, t.index);
+        last = t.index + t[0].length;
+        if (text === '') continue;
+        const start = parseInt(t[1], 10), dur = parseInt(t[2], 10);
+        parts.push({ text, start, end: dur > 0 ? start + dur : null });
+      }
+      if (!parts.length) continue;
+      const lineText = parts.map((x) => x.text).join('').trim();
+      if (!lineText) continue;
+      rows.push({ start: parseInt(h[1], 10), dur: parseInt(h[2], 10), parts, lineText });
+    }
+    // Drop the title/artist echo and credit lines QQ puts at the top.
+    const kept = rows.filter((r, i) => {
+      if (QRC_CREDIT_RE.test(r.lineText)) return false;
+      if (i < 4) {
+        const n = norm(r.lineText);
+        if (nt && n.includes(nt) && (!na || n.includes(na) || n.length < nt.length + 15)) return false;
+        if (na && n === na) return false;
+      }
+      return true;
+    });
+    const lines = [];
+    kept.forEach((r, i) => {
+      const nextStart = i < kept.length - 1 ? kept[i + 1].start : (durationMs || r.start + r.dur || r.start + 8000);
+      const words = buildWordsFromParts(r.parts);
+      if (!words.length) return;
+      repairTimings(words, r.dur > 0 ? r.start + r.dur : nextStart);
+      const end = Math.max(r.dur > 0 ? r.start + r.dur : nextStart, words[words.length - 1].end);
+      lines.push({
+        start: Math.min(r.start, words[0].start),
+        end,
+        words,
+        text: words.map((w) => w.text + (w.joined ? '' : ' ')).join('').trim(),
+      });
+    });
+    const res = finalizeResult(lines);
+    // QQ tokens are whole words (or single CJK characters): by definition
+    // word-level, so never advertise it as syllable-synced.
+    if (res) res.mode = 'word';
+    return res;
   }
 
   function parsePlain(text) {
@@ -210,8 +450,9 @@
     return { mode: 'plain', lines };
   }
 
-  const MODE_RANK = { word: 3, line: 2, plain: 1 };
-  function better(a, b) {
+  // syllable > word > line > plain
+  const MODE_RANK = { syllable: 4, word: 3, line: 2, plain: 1 };
+    function better(a, b) {
     if (!a) return b;
     if (!b) return a;
     return (MODE_RANK[b.mode] || 0) > (MODE_RANK[a.mode] || 0) ? b : a;
@@ -254,44 +495,56 @@
   }
 
   
+  // Better Lyrics — syllable-synced TTML (falls back to line-level if the
+  // document only times whole lines).
   async function fromBetterLyricsTTML(track) {
-    const qs = new URLSearchParams({ s: track.song, a: track.artist });
-    if (track.duration) qs.set('d', String(track.duration));
-    const data = await safeFetchJson(`${BETTERLYRICS_BASE}/getLyrics?${qs}`);
-    if (!data || !data.ttml) return null;
-    const parsed = parseTTML(data.ttml);
+    const data = await fetchJsonFromBases(BETTERLYRICS_BASES, '/getLyrics', baseQuery(track));
+    const ttml = data && (data.ttml || data.lyrics);
+    if (!ttml) return null;
+    const parsed = checkTiming(parseTTML(ttml), track, 'BetterLyrics (TTML)');
     if (!parsed) return null;
-    if (!isTimingPlausible(parsed, track)) {
-      log('BetterLyrics (TTML) result rejected: timing does not match track duration');
-      return null;
-    }
     parsed.provider = 'BetterLyrics (TTML)';
     return parsed;
   }
 
+  // Better Lyrics Legato — Kugou, line-synced.
   async function fromBetterLyricsKugou(track) {
-    const qs = new URLSearchParams({ s: track.song, a: track.artist });
-    if (track.duration) qs.set('d', String(track.duration));
-    const data = await safeFetchJson(`${BETTERLYRICS_BASE}/kugou/getLyrics?${qs}`);
+    const data = await fetchJsonFromBases(BETTERLYRICS_BASES, '/kugou/getLyrics', baseQuery(track));
     if (!data || !data.lyrics) return null;
-    const parsed = parseLRC(data.lyrics);
-    if (!parsed) return null;
-    if (!isTimingPlausible(parsed, track)) {
-      log('BetterLyrics (Kugou) result rejected: timing does not match track duration');
-      return null;
+    let text = data.lyrics;
+    if (typeof text === 'string' && text.trim().startsWith('{')) {
+      try { text = JSON.parse(text).lyrics || text; } catch { /* keep as is */ }
     }
-    parsed.provider = 'BetterLyrics (Kugou)';
+    const parsed = checkTiming(parseLRC(text), track, 'BetterLyrics (Legato)');
+    if (!parsed) return null;
+    parsed.provider = 'BetterLyrics (Legato)';
+    return parsed;
+  }
+
+  // Better Lyrics Portato — QQ Music QRC, word-synced.
+  async function fromBetterLyricsPortato(track) {
+    const data = await fetchJsonFromBases(BETTERLYRICS_BASES, '/qq/getLyrics', baseQuery(track));
+    if (!data || !data.lyrics) return null;
+    let text = data.lyrics;
+    if (typeof text === 'string' && text.trim().startsWith('{')) {
+      try { text = JSON.parse(text).lyrics || text; } catch { /* keep as is */ }
+    }
+    const parsed = checkTiming(
+      parseQRC(text, Number(track.duration) > 0 ? Number(track.duration) * 1000 : 0, { title: track.song, artist: track.artist }),
+      track, 'BetterLyrics (Portato)');
+    if (!parsed) return null;
+    parsed.provider = 'BetterLyrics (Portato)';
     return parsed;
   }
 
   async function fromBetterLyricsLegacy(track) {
     const qs = new URLSearchParams({ s: track.song, a: track.artist });
-    const data = await safeFetchJson(`${BETTERLYRICS_BASE}/legacy/getLyrics?${qs}`);
+    // The legacy endpoint only exists on the original host.
+    const data = await fetchJsonFromBases([...BETTERLYRICS_BASES].reverse(), '/legacy/getLyrics', qs);
     if (!data) return null;
     if (data.lyrics) {
       const parsed = parseLRC(data.lyrics);
       if (parsed && isTimingPlausible(parsed, track)) { parsed.provider = 'BetterLyrics (Legacy)'; return parsed; }
-      if (parsed) log('BetterLyrics (Legacy) result rejected: timing does not match track duration');
     }
     if (Array.isArray(data.lines)) {
       const lines = data.lines
@@ -303,11 +556,7 @@
           lines[i].end = i < lines.length - 1 ? lines[i + 1].start : lines[i].start + 8000;
         }
         const parsed = { mode: 'line', lines, provider: 'BetterLyrics (Legacy)' };
-        if (!isTimingPlausible(parsed, track)) {
-          log('BetterLyrics (Legacy) result rejected: timing does not match track duration');
-          return null;
-        }
-        return parsed;
+        return isTimingPlausible(parsed, track) ? parsed : null;
       }
     }
     return null;
@@ -341,26 +590,26 @@
   // highest-scored match; format is one of ttml/lrc/plain, same shapes our
   // existing parsers already handle for the other providers.
   async function fromUnison(track) {
-    const qs = new URLSearchParams({ song: track.song, artist: track.artist });
-    if (track.duration) qs.set('duration', String(track.duration));
-    const res = await safeFetchJson(`${UNISON_BASE}/lyrics?${qs}`);
-    const data = res && res.success ? res.data : null;
+    const qs = new URLSearchParams({ song: track.song, artist: track.artist || '' });
+    if (track.videoId) qs.set('v', track.videoId);
+    if (track.album) qs.set('album', track.album);
+    if (track.duration) qs.set('duration', String(Math.round(track.duration)));
+    const res = await fetchJsonFromBases(UNISON_BASES, '/lyrics', qs);
+    const data = res ? (res.data || (res.success ? res.data : null)) : null;
     if (!data || !data.lyrics) return null;
 
+    // Unison stores: ttml (syllable or line), lrc (word-level "richsync" or
+    // line-level "linesync"), plain.
     let parsed = null;
     if (data.format === 'ttml') parsed = parseTTML(data.lyrics);
-    else if (data.format === 'lrc') parsed = parseLRC(data.lyrics);
-    else parsed = parsePlain(data.lyrics);
+    else if (data.format === 'lrc') {
+      parsed = (data.syncType === 'richsync' ? parseEnhancedLRC(data.lyrics) : null)
+        || parseEnhancedLRC(data.lyrics)
+        || parseLRC(String(data.lyrics).replace(/<\d{1,2}:\d{2}(?:\.\d{1,3})?>/g, ''));
+    } else parsed = parsePlain(data.lyrics);
 
+    parsed = checkTiming(parsed, track, 'Unison');
     if (!parsed) return null;
-    // Unison returns a single "best match" from a crowdsourced DB with no
-    // candidate list to disambiguate against — if it picked the wrong
-    // version/edit of this song, the only signal we have is that its
-    // timeline won't line up with the real track length.
-    if (!isTimingPlausible(parsed, track)) {
-      log('Unison result rejected: timing does not match track duration');
-      return null;
-    }
     parsed.provider = 'Unison';
     return parsed;
   }
@@ -370,6 +619,7 @@
   // document. We prefer a word-synced ("word") result if one is offered,
   // otherwise take the top hit, then fetch that URL separately and parse it
   // with the same TTML parser BetterLyrics (TTML) uses.
+  const isRichTiming = (t) => t === 'word' || t === 'syllable';
   async function fromBiniLyrics(track) {
     const query = `${track.song} ${track.artist || ''}`.trim();
     if (!query) return null;
@@ -399,8 +649,8 @@
           // Unknown-duration entries sort after known ones, but a
           // word-synced entry still gets priority among equally-plausible
           // (or equally-unknown) candidates.
-          const aWord = a.r.timing_type === 'word' ? 0 : 1;
-          const bWord = b.r.timing_type === 'word' ? 0 : 1;
+          const aWord = isRichTiming(a.r.timing_type) ? 0 : 1;
+          const bWord = isRichTiming(b.r.timing_type) ? 0 : 1;
           if ((a.delta == null) !== (b.delta == null)) return a.delta == null ? 1 : -1;
           if (a.delta != null && b.delta != null && Math.abs(a.delta - b.delta) > 3) return a.delta - b.delta;
           return aWord - bWord;
@@ -409,7 +659,8 @@
     } else {
       // No known duration to disambiguate with — fall back to the old
       // "prefer word-synced" behavior.
-      ranked = ranked.find((r) => r.timing_type === 'word') ? [ranked.find((r) => r.timing_type === 'word'), ...ranked] : ranked;
+      const richHit = ranked.find((r) => isRichTiming(r.timing_type));
+      ranked = richHit ? [richHit, ...ranked] : ranked;
     }
 
     const best = ranked[0];
@@ -429,6 +680,46 @@
   }
 
   
+  // lrc.red — keyed by ISRC. background.js (lrcred.js) resolves the ISRC and
+  // downloads the raw TTML/LRC text; parsing happens here because it needs
+  // DOMParser. Word-synced TTML is preferred; if it has no usable word
+  // timing (or fails the duration sanity check) we fall back to its LRC.
+  async function fromLrcRed(track) {
+    try {
+      const response = await chrome.runtime.sendMessage({
+        type: 'VIVI_LRCRED_LYRICS',
+        track: { song: track.song, artist: track.artist, duration: track.duration || 0 },
+      });
+      const d = response?.data;
+      if (!response?.ok || !d) return null;
+
+      if (d.format === 'ttml') {
+        const parsed = parseTTML(d.text);
+        if (parsed && isTimingPlausible(parsed, track)) { parsed.provider = 'lrc.red'; return parsed; }
+        if (parsed) log('lrc.red TTML rejected: timing does not match track duration');
+      }
+      const lrcText = d.format === 'lrc' ? d.text : d.lrc;
+      if (lrcText) {
+        const enhanced = parseEnhancedLRC(lrcText);
+        if (enhanced && isTimingPlausible(enhanced, track)) { enhanced.provider = 'lrc.red'; return enhanced; }
+        // Enhanced-LRC word tags (<00:12.34>) would otherwise end up in the text.
+        const cleaned = lrcText.replace(/<\d{1,2}:\d{2}(?:\.\d{1,3})?>/g, '');
+        const synced = parseLRC(cleaned);
+        if (synced) {
+          if (!isTimingPlausible(synced, track)) { log('lrc.red LRC rejected: timing mismatch'); return null; }
+          synced.provider = 'lrc.red';
+          return synced;
+        }
+        const plain = parsePlain(cleaned.replace(/^\[[a-z]{2}:.*\]$/gim, ''));
+        if (plain) { plain.provider = 'lrc.red'; return plain; }
+      }
+      return null;
+    } catch (e) {
+      log('lrc.red request failed', e?.message || e);
+      return null;
+    }
+  }
+
   async function fromMusixmatch(track) {
     try {
       const response = await chrome.runtime.sendMessage({
@@ -444,6 +735,7 @@
       if (!response?.ok || !response.lyrics) return null;
       const parsed = response.lyrics;
       if ((parsed.mode === 'word' || parsed.mode === 'line') && Array.isArray(parsed.lines)) {
+        if (parsed.mode === 'word') parsed.lines.forEach((l) => { if (Array.isArray(l.words)) l.words.forEach((w) => { if (!w.syllables) w.syllables = [{ text: w.text, start: w.start, end: w.end }]; }); });
         // Musixmatch's search can match a different edit/version of the
         // track (background.js narrows this further, but double-check
         // here too since this is the actual point where the fill-up
@@ -549,17 +841,21 @@
     });
   }
 
-  function raceProviders(jobs) {
+  // Priority OFF path. The first reply is handed to onUpdate immediately so
+  // lyrics appear as fast as possible; replies arriving within the next
+  // UPGRADE_WINDOW_MS are compared by sync level and the best one replaces
+  // it (onUpdate fires again). Resolves with the final best result.
+  function raceProviders(jobs, onUpdate) {
     return new Promise((resolve) => {
       let best = null;
       let remaining = jobs.length;
-      let graceTimer = null;
+      let timer = null;
       let done = false;
 
       const finish = () => {
         if (done) return;
         done = true;
-        clearTimeout(graceTimer);
+        clearTimeout(timer);
         resolve(best);
       };
 
@@ -567,11 +863,16 @@
         jobPromise
           .then((value) => {
             remaining--;
-            if (value) {
+            if (value && !done) {
+              const prev = best;
               best = better(best, value);
               log('provider replied', value.provider, value.mode);
-              // Start (or let run) the grace window on the first real hit.
-              if (!graceTimer) graceTimer = setTimeout(finish, GRACE_PERIOD_MS);
+              if (!prev) {
+                timer = setTimeout(finish, UPGRADE_WINDOW_MS);
+              }
+              if (best !== prev && typeof onUpdate === 'function') onUpdate(best);
+              // Nothing outranks syllable sync — no reason to keep waiting.
+              if (best.mode === 'syllable') finish();
             }
             if (remaining === 0) finish();
           })
@@ -590,9 +891,11 @@
   // fetchBestLyrics() can exclude, without the UI having to duplicate this
   // list itself.
   const PROVIDER_NAME_BY_KEY = {
+    lrcred: 'lrc.red',
     betterlyricsTTML: 'BetterLyrics (TTML)',
-    betterlyricsKugou: 'BetterLyrics (Kugou)',
+    betterlyricsKugou: 'BetterLyrics (Legato)',
     betterlyricsLegacy: 'BetterLyrics (Legacy)',
+    betterlyricsPortato: 'BetterLyrics (Portato)',
     lrclib: 'LRCLIB',
     musixmatch: 'Musixmatch',
     unison: 'Unison',
@@ -603,6 +906,7 @@
     Object.entries(PROVIDER_NAME_BY_KEY).map(([k, v]) => [v, k])
   );
   function providerKeyForName(name) {
+    if (name === 'BetterLyrics (Kugou)') return 'betterlyricsKugou'; // pre-rename label
     return PROVIDER_KEY_BY_NAME[name] || null;
   }
 
@@ -615,9 +919,12 @@
   // here — that bookkeeping lives in the UI layer.
   async function fetchBestLyrics(track, opts) {
     const excludeKeys = new Set((opts && opts.excludeKeys) || []);
+    const onUpdate = opts && opts.onUpdate;
     const jobDefs = [];
+    if (providerSettings.lrcred && !excludeKeys.has('lrcred'))                 jobDefs.push({ key: 'lrcred', promise: fromLrcRed(track) });
     if (providerSettings.betterlyricsTTML && !excludeKeys.has('betterlyricsTTML'))   jobDefs.push({ key: 'betterlyricsTTML', promise: fromBetterLyricsTTML(track) });
     if (providerSettings.betterlyricsKugou && !excludeKeys.has('betterlyricsKugou'))  jobDefs.push({ key: 'betterlyricsKugou', promise: fromBetterLyricsKugou(track) });
+    if (providerSettings.betterlyricsPortato && !excludeKeys.has('betterlyricsPortato')) jobDefs.push({ key: 'betterlyricsPortato', promise: fromBetterLyricsPortato(track) });
     if (providerSettings.lrclib && !excludeKeys.has('lrclib'))             jobDefs.push({ key: 'lrclib', promise: fromLrclib(track) });
     if (providerSettings.betterlyricsLegacy && !excludeKeys.has('betterlyricsLegacy')) jobDefs.push({ key: 'betterlyricsLegacy', promise: fromBetterLyricsLegacy(track) });
     if (providerSettings.musixmatch && !excludeKeys.has('musixmatch'))         jobDefs.push({ key: 'musixmatch', promise: fromMusixmatch(track) });
@@ -639,11 +946,11 @@
           const remainingJobs = jobDefs.filter((j) => !orderedKeys.includes(j.key));
           if (remainingJobs.length) {
             log('priority list empty-handed, falling back to other enabled providers');
-            best = await raceProviders(remainingJobs.map((j) => j.promise));
+            best = await raceProviders(remainingJobs.map((j) => j.promise), onUpdate);
           }
         }
       } else {
-        best = await raceProviders(jobDefs.map((j) => j.promise));
+        best = await raceProviders(jobDefs.map((j) => j.promise), onUpdate);
       }
     }
 
@@ -659,5 +966,5 @@
     return best;
   }
 
-  window.__viviLyrics = { fetchBestLyrics, parseTTML, parseLRC, parsePlain, providerKeyForName };
+  window.__viviLyrics = { fetchBestLyrics, parseTTML, parseLRC, parseEnhancedLRC, parseQRC, parsePlain, providerKeyForName };
 })();

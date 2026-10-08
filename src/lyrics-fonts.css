@@ -1,0 +1,49 @@
+/* Vivimusic lyrics fonts
+   Bundled locally (src/fonts/*.woff2, all SIL OFL 1.1) so nothing is fetched
+   from the network. Shared by the content script (manifest css) and the popup
+   (<link>). The font classes below only target .vivi-lyrics-line, so YouTube
+   Music's own UI, the lyrics credit row and the popup text are never touched.
+   Font family names are prefixed so they can't clash with page fonts. */
+
+@font-face { font-family: "ViviLyr Playfair"; src: url("fonts/playfair-display.woff2") format("woff2"); font-weight: 400 900; font-display: swap; }
+@font-face { font-family: "ViviLyr Cormorant"; src: url("fonts/cormorant.woff2") format("woff2"); font-weight: 300 700; font-display: swap; size-adjust: 118%; }
+@font-face { font-family: "ViviLyr DM Serif"; src: url("fonts/dm-serif-display.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+@font-face { font-family: "ViviLyr Lora"; src: url("fonts/lora.woff2") format("woff2"); font-weight: 400 700; font-display: swap; }
+@font-face { font-family: "ViviLyr Poppins"; src: url("fonts/poppins.woff2") format("woff2"); font-weight: 700; font-display: swap; }
+@font-face { font-family: "ViviLyr Montserrat"; src: url("fonts/montserrat.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: "ViviLyr Outfit"; src: url("fonts/outfit.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: "ViviLyr Space Grotesk"; src: url("fonts/space-grotesk.woff2") format("woff2"); font-weight: 300 700; font-display: swap; }
+@font-face { font-family: "ViviLyr Caveat"; src: url("fonts/caveat.woff2") format("woff2"); font-weight: 400 700; font-display: swap; size-adjust: 125%; }
+@font-face { font-family: "ViviLyr Dancing"; src: url("fonts/dancing-script.woff2") format("woff2"); font-weight: 400 700; font-display: swap; size-adjust: 112%; }
+@font-face { font-family: "ViviLyr Pacifico"; src: url("fonts/pacifico.woff2") format("woff2"); font-weight: 400; font-display: swap; size-adjust: 92%; }
+@font-face { font-family: "ViviLyr Bebas"; src: url("fonts/bebas-neue.woff2") format("woff2"); font-weight: 400; font-display: swap; size-adjust: 110%; }
+
+/* Lyrics only. Non-Latin scripts (Hindi, Bengali, Korean, Japanese…) aren't in
+   these files, so they fall through to the same stack the lyrics used before. */
+.vivi-lyrics-list.vivi-lyrics-font-playfair .vivi-lyrics-line { font-family: "ViviLyr Playfair", "Inter", "PingFangSC-Regular", "Apple SD Gothic Neo", system-ui, sans-serif; font-weight: 700; }
+.vivi-lyrics-list.vivi-lyrics-font-cormorant .vivi-lyrics-line { font-family: "ViviLyr Cormorant", "Inter", "PingFangSC-Regular", "Apple SD Gothic Neo", system-ui, sans-serif; font-weight: 700; }
+.vivi-lyrics-list.vivi-lyrics-font-dmserif .vivi-lyrics-line { font-family: "ViviLyr DM Serif", "Inter", "PingFangSC-Regular", "Apple SD Gothic Neo", system-ui, sans-serif; font-weight: 400; }
+.vivi-lyrics-list.vivi-lyrics-font-lora .vivi-lyrics-line { font-family: "ViviLyr Lora", "Inter", "PingFangSC-Regular", "Apple SD Gothic Neo", system-ui, sans-serif; font-weight: 700; }
+.vivi-lyrics-list.vivi-lyrics-font-poppins .vivi-lyrics-line { font-family: "ViviLyr Poppins", "Inter", "PingFangSC-Regular", "Apple SD Gothic Neo", system-ui, sans-serif; font-weight: 700; }
+.vivi-lyrics-list.vivi-lyrics-font-montserrat .vivi-lyrics-line { font-family: "ViviLyr Montserrat", "Inter", "PingFangSC-Regular", "Apple SD Gothic Neo", system-ui, sans-serif; font-weight: 700; }
+.vivi-lyrics-list.vivi-lyrics-font-outfit .vivi-lyrics-line { font-family: "ViviLyr Outfit", "Inter", "PingFangSC-Regular", "Apple SD Gothic Neo", system-ui, sans-serif; font-weight: 700; }
+.vivi-lyrics-list.vivi-lyrics-font-spacegrotesk .vivi-lyrics-line { font-family: "ViviLyr Space Grotesk", "Inter", "PingFangSC-Regular", "Apple SD Gothic Neo", system-ui, sans-serif; font-weight: 700; }
+.vivi-lyrics-list.vivi-lyrics-font-caveat .vivi-lyrics-line { font-family: "ViviLyr Caveat", "Inter", "PingFangSC-Regular", "Apple SD Gothic Neo", system-ui, sans-serif; font-weight: 700; }
+.vivi-lyrics-list.vivi-lyrics-font-dancing .vivi-lyrics-line { font-family: "ViviLyr Dancing", "Inter", "PingFangSC-Regular", "Apple SD Gothic Neo", system-ui, sans-serif; font-weight: 700; }
+.vivi-lyrics-list.vivi-lyrics-font-pacifico .vivi-lyrics-line { font-family: "ViviLyr Pacifico", "Inter", "PingFangSC-Regular", "Apple SD Gothic Neo", system-ui, sans-serif; font-weight: 400; line-height: 1.5; }
+.vivi-lyrics-list.vivi-lyrics-font-bebas .vivi-lyrics-line { font-family: "ViviLyr Bebas", "Inter", "PingFangSC-Regular", "Apple SD Gothic Neo", system-ui, sans-serif; font-weight: 400; letter-spacing: 0.03em; }
+
+/* Popup: live preview line + font-name rendering inside the picker. */
+#lyricsFontPreview { font-size: 18px; line-height: 1.4; color: var(--text-1, #f2f2f5); margin: 2px 0 6px; padding: 6px 8px; border-radius: 8px; background: rgba(255,255,255,0.04); }
+#lyricsFontPreview.vivi-lyrics-font-playfair { font-family: "ViviLyr Playfair", sans-serif; font-weight: 700; }
+#lyricsFontPreview.vivi-lyrics-font-cormorant { font-family: "ViviLyr Cormorant", sans-serif; font-weight: 700; }
+#lyricsFontPreview.vivi-lyrics-font-dmserif { font-family: "ViviLyr DM Serif", sans-serif; font-weight: 400; }
+#lyricsFontPreview.vivi-lyrics-font-lora { font-family: "ViviLyr Lora", sans-serif; font-weight: 700; }
+#lyricsFontPreview.vivi-lyrics-font-poppins { font-family: "ViviLyr Poppins", sans-serif; font-weight: 700; }
+#lyricsFontPreview.vivi-lyrics-font-montserrat { font-family: "ViviLyr Montserrat", sans-serif; font-weight: 700; }
+#lyricsFontPreview.vivi-lyrics-font-outfit { font-family: "ViviLyr Outfit", sans-serif; font-weight: 700; }
+#lyricsFontPreview.vivi-lyrics-font-spacegrotesk { font-family: "ViviLyr Space Grotesk", sans-serif; font-weight: 700; }
+#lyricsFontPreview.vivi-lyrics-font-caveat { font-family: "ViviLyr Caveat", sans-serif; font-weight: 700; }
+#lyricsFontPreview.vivi-lyrics-font-dancing { font-family: "ViviLyr Dancing", sans-serif; font-weight: 700; }
+#lyricsFontPreview.vivi-lyrics-font-pacifico { font-family: "ViviLyr Pacifico", sans-serif; font-weight: 400; }
+#lyricsFontPreview.vivi-lyrics-font-bebas { font-family: "ViviLyr Bebas", sans-serif; font-weight: 400; letter-spacing: 0.03em; }

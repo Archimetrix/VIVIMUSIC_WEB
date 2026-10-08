@@ -71,7 +71,7 @@
       observer.disconnect();
       // console.warn directly, not warn(): observeDom runs before `warn` is
       // initialized further down this file (temporal dead zone).
-      try { callback(); } catch (e) { console.warn('[Vivi]', `${label} failed`, e?.message); }
+      try { callback(); } catch (e) { console.debug('[Vivi]', `${label} failed`, e?.message); }
       if (!tripped) connect();
     };
 
@@ -86,7 +86,7 @@
       if (++runsInWindow > BURST_LIMIT) {
         tripped = true;
         observer.disconnect();
-        console.warn('[Vivi]', `${label}: mutation storm detected — falling back to polling`);
+        console.debug('[Vivi]', `${label}: mutation storm detected — falling back to polling`);
         setInterval(() => { try { callback(); } catch { /* no-op */ } }, FALLBACK_INTERVAL_MS);
         return;
       }
@@ -284,7 +284,7 @@
   let lastfmLikeObserver = null;
 
   const log  = (...a) => DEBUG && console.log('[Vivi]', ...a);
-  const warn = (...a) => console.warn('[Vivi]', ...a);
+  const warn = (...a) => DEBUG && console.debug('[Vivi]', ...a);
 
   
   function applyTheme(enabled) {
@@ -358,8 +358,10 @@
   function setBackgroundVar(imageUrl) {
     const inner = ensureBgEl();
     if (!inner) return;
-    let url = imageUrl;
-    if (!url) {
+    // Ambient layer follows the miniplayer thumbnail (same source as Kawarp),
+    // so Apple/iTunes covers can't leave Home tinted by a different cover.
+    let url = null;
+    if (true) {
       // Scope this strictly inside the player bar itself. #thumbnail is a
       // generic id YT Music reuses on lots of unrelated list-item tiles
       // (queue, up-next, home shelves) — an unscoped document-wide selector
@@ -372,6 +374,7 @@
       );
       if (thumb?.src) url = thumb.src;
     }
+    if (!url) url = imageUrl;
     if (url) {
       inner.style.backgroundImage = `url("${url}")`;
       
@@ -380,7 +383,6 @@
       // It layers on top of this static blurred image and cross-fades in,
       // so nothing regresses if Kawarp is off, still loading, or fails
       // (e.g. a thumbnail host that doesn't send permissive CORS headers).
-      window.__viviKawarp?.setArtwork(url);
     }
   }
 
@@ -1208,7 +1210,7 @@
           // silently falling back — check data.type/details/response.url
           // here first before assuming it's the same aaplimg.com/itunes.apple.com
           // permission gap this was written to fix.
-          console.warn('[Vivi] Apple Canvas hls.js fatal error:', data.type, data.details, data.response?.url || url);
+          console.debug('[Vivi] Apple Canvas hls.js fatal error:', data.type, data.details, data.response?.url || url);
           vid.dispatchEvent(new Event('error'));
         }
       });
@@ -2760,11 +2762,11 @@
     enabled: true, themeEnabled: true, imageOnlyMode: false, spotifyCanvasEnabled: true, canvasPriority: 'apple', sponsorBlockEnabled: true,
     kawarpEnabled: true, kawarpPauseWhenInactive: true, eqEnabled: true,
     kawarpWarpIntensity: 1.0, kawarpBlurPasses: 5, kawarpAnimationSpeed: 4.15,
-    kawarpTransitionDuration: 0, kawarpSaturation: 2.6, kawarpDithering: 0.034, kawarpOpacity: 1.0,
+    kawarpTransitionDuration: 0, kawarpSaturation: 2.6, kawarpDithering: 0.034, kawarpOpacity: 1.0, kawarpBrightness: 0.5,
   }, ({
     enabled, themeEnabled, imageOnlyMode: imgOnly, spotifyCanvasEnabled: spCanvas, canvasPriority: canvasPrio, sponsorBlockEnabled: sbEnabled,
     kawarpEnabled: kwEnabled, kawarpPauseWhenInactive: kwPause, eqEnabled: eqEnabled_,
-    kawarpWarpIntensity, kawarpBlurPasses, kawarpAnimationSpeed, kawarpTransitionDuration, kawarpSaturation, kawarpDithering, kawarpOpacity,
+    kawarpWarpIntensity, kawarpBlurPasses, kawarpAnimationSpeed, kawarpTransitionDuration, kawarpSaturation, kawarpDithering, kawarpOpacity, kawarpBrightness,
   }) => {
     bindCanvasTrackTransitionGuard();
     appleCanvasEnabled = enabled !== false;
@@ -2782,6 +2784,7 @@
       saturation: kawarpSaturation,
       dithering: kawarpDithering,
       opacity: kawarpOpacity,
+      brightness: kawarpBrightness,
     });
     window.__viviKawarp?.setPauseWhenInactive(kwPause !== false);
     kawarpUserEnabled = kwEnabled !== false;
@@ -3121,6 +3124,7 @@
           kawarpSaturation: 'saturation',
           kawarpDithering: 'dithering',
           kawarpOpacity: 'opacity',
+          kawarpBrightness: 'brightness',
         };
         const liveOpts = {};
         let hasLiveOpts = false;

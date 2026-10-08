@@ -34,9 +34,10 @@
   let pendingOptions = null;   // options set before Kawarp instance exists
   let pauseWhenInactive = true; // "Pause when inactive" setting
   let pausedForVisibility = false;
+  let brightness = 0.5;       // CSS brightness on the canvas (1 = unchanged)
 
   function log(...a) { console.log('[Vivi Kawarp]', ...a); }
-  function warn(...a) { console.warn('[Vivi Kawarp]', ...a); }
+  function warn(...a) { console.debug('[Vivi Kawarp]', ...a); }
 
   function getWrapper() {
     return document.getElementById(BG_ID);
@@ -59,6 +60,7 @@
       'display:block',
       'opacity:0',
       'transition:opacity 0.6s ease-in-out',
+      `filter:brightness(${brightness})`,
     ].join(';');
     wrapper.appendChild(el);
     return el;
@@ -126,29 +128,58 @@
     canvas.style.opacity = '0';
   }
 
+  // Strip YouTube Music's size suffix (=w60-h60-l90-rj etc.) so the same cover
+  // at different sizes counts as ONE image, and upsize it for a sharper source.
+  const SIZE_SUFFIX_RE = /=w\d+-h\d+[^?#]*$/;
+  function artKey(url) { return String(url).replace(SIZE_SUFFIX_RE, ''); }
+  function upsize(url) { return SIZE_SUFFIX_RE.test(url) ? url.replace(SIZE_SUFFIX_RE, '=w544-h544-l90-rj') : url; }
+
+  function loadImg(src) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('load failed: ' + src));
+      img.src = src;
+    });
+  }
+
+  // Kawarp is driven ONLY by the player-bar thumbnail (see watchBarThumb).
+  // Apple/Spotify artwork never reaches here, so nothing can fight over it.
   async function applyArtwork(url) {
     if (!url || !webglOk) return;
-    if (url === lastUrl) return;
-    pendingUrl = url;
+    const key = artKey(url);
+    if (key === lastUrl) return;
+    try {
+      const u = new URL(url, location.href);
+      if (!/^https?:$/.test(u.protocol) || u.href === location.href || u.pathname === '/') return;
+    } catch { return; }
+    pendingUrl = key;
 
     const inst = initKawarp();
     if (!inst) return;
 
+    let img;
     try {
-      await inst.loadImage(url);
-      // Another track may have changed while the image was loading — only
-      // commit/show if this is still the most recently requested artwork.
-      if (pendingUrl !== url) return;
-      lastUrl = url;
-      if (!(pauseWhenInactive && document.hidden)) {
-        inst.start();
-      }
-      if (enabled) showCanvas();
+      try { img = await loadImg(upsize(url)); }
+      catch { img = await loadImg(url); } // upsized variant unavailable -> original
     } catch (e) {
-      // Most likely a CORS-restricted thumbnail host. Fail quietly and keep
-      // showing the existing static blurred-image background instead.
-      warn('Failed to load artwork into Kawarp, falling back to static blur:', e?.message || e);
-      hideCanvas();
+      warn('Failed to load artwork into Kawarp:', e?.message || e);
+      return;
+    }
+    // A newer track arrived while loading: drop this one BEFORE touching the
+    // GL texture (the old code uploaded first, so a slow stale load could win).
+    if (pendingUrl !== key) return;
+    try {
+      inst.loadImageElement(img);
+    } catch (e) {
+      warn('Kawarp texture upload failed:', e?.message || e);
+      return;
+    }
+    lastUrl = key;
+    if (enabled) {
+      if (!(pauseWhenInactive && document.hidden)) inst.start();
+      showCanvas();
     }
   }
 
@@ -157,8 +188,16 @@
   // Called from content.js when the user changes a slider in the popup.
   function setOptions(opts) {
     if (!opts) return;
-    pendingOptions = Object.assign({}, pendingOptions, opts);
-    kawarp?.setOptions(opts);
+    // Brightness isn't a Kawarp shader option — it's applied as a CSS filter
+    // on the canvas, so handle it here and keep it out of the Kawarp options.
+    const { brightness: nextBrightness, ...kawarpOpts } = opts;
+    if (nextBrightness !== undefined && Number.isFinite(Number(nextBrightness))) {
+      brightness = Math.max(0.1, Math.min(2, Number(nextBrightness)));
+      const el = document.getElementById(CANVAS_ID);
+      if (el) el.style.filter = `brightness(${brightness})`;
+    }
+    pendingOptions = Object.assign({}, pendingOptions, kawarpOpts);
+    kawarp?.setOptions(kawarpOpts);
   }
 
   function setPauseWhenInactive(next) {
@@ -181,6 +220,55 @@
   }
   document.addEventListener('visibilitychange', handleVisibilityChange);
 
+
+  // ── Follow the player-bar thumbnail directly ─────────────────────────────
+  // content.js hands Kawarp an artwork URL by reading the player bar's <img>
+  // at the instant the track changes. YouTube Music swaps that <img>'s src a
+  // moment *after* the track change, so the read returned the PREVIOUS song's
+  // thumbnail, and nothing re-read it until the Spotify/Apple lookups finished
+  // (several seconds) — Kawarp kept animating the old art until then. Watching
+  // the thumbnail's src ourselves means the new cover is picked up the moment
+  // YouTube Music updates it. Apple/Spotify artwork passed in through
+  // setArtwork() still overrides it afterwards, exactly as before.
+  const BAR_IMG_SELECTOR = '.image-wrapper img, ytmusic-thumbnail img, #thumbnail img, .thumbnail-image-wrapper img';
+  let barObserver = null;
+  let barImgEl = null;
+  let barSyncScheduled = false;
+
+  function readBarThumbUrl() {
+    const bar = document.querySelector('ytmusic-player-bar');
+    const img = bar?.querySelector(BAR_IMG_SELECTOR);
+    const src = img?.currentSrc || img?.src || '';
+    // Ignore empty / inline placeholders YouTube Music shows while loading.
+    if (!src || src.startsWith('data:') || src.startsWith('blob:') || src === location.href || src === location.origin + '/') return null;
+    return src;
+  }
+
+  function syncFromBar() {
+    barSyncScheduled = false;
+    const url = readBarThumbUrl();
+    if (url && artKey(url) !== lastUrl) applyArtwork(url);
+  }
+
+  function scheduleBarSync() {
+    if (barSyncScheduled) return;
+    barSyncScheduled = true;
+    queueMicrotask(syncFromBar);
+  }
+
+  function watchBarThumb() {
+    const bar = document.querySelector('ytmusic-player-bar');
+    if (!bar) { setTimeout(watchBarThumb, 500); return; }
+    if (barObserver) return;
+    barObserver = new MutationObserver(scheduleBarSync);
+    barObserver.observe(bar, { attributes: true, attributeFilter: ['src', 'srcset'], childList: true, subtree: true });
+    // The <img> can finish loading a new src without the attribute changing
+    // again (cached images), so also listen for load events on the bar.
+    bar.addEventListener('load', scheduleBarSync, true);
+    scheduleBarSync();
+  }
+  watchBarThumb();
+
   function setEnabled(next) {
     enabled = !!next;
     if (!enabled) {
@@ -188,6 +276,9 @@
       kawarp?.stop();
       return;
     }
+    // Catch up with whatever is playing now — lastUrl can be a stale cover
+    // from before Kawarp was switched on / the full player was reopened.
+    scheduleBarSync();
     if (lastUrl) {
       initKawarp();
       if (!(pauseWhenInactive && document.hidden)) {
@@ -206,7 +297,7 @@
   }
 
   window.__viviKawarp = {
-    setArtwork: applyArtwork,
+    setArtwork: () => {}, // intentionally ignored: bar thumbnail is the only source
     setEnabled,
     setOptions,
     setPauseWhenInactive,

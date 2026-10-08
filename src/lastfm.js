@@ -54,6 +54,23 @@ async function lastfmLogin(username, password) {
   return { sessionKey: data.session.key, username: data.session.name };
 }
 
+// Web auth flow (https://www.last.fm/api/webauth): get a request token, send
+// the user to last.fm to approve it in a normal tab (where password managers,
+// 2FA and social logins all work), then exchange the approved token for a
+// session key. Last.fm error 14 = token not approved yet, 15 = token expired.
+async function lastfmGetToken() {
+  const data = await callLastfm('auth.getToken', {});
+  return data.token || null;
+}
+
+async function lastfmGetSessionFromToken(token) {
+  const data = await callLastfm('auth.getSession', { token });
+  if (!data.session || !data.session.key) {
+    throw new Error('Last.fm did not return a session key.');
+  }
+  return { sessionKey: data.session.key, username: data.session.name };
+}
+
 async function lastfmUpdateNowPlaying(sessionKey, track) {
   return callLastfm(
     'track.updateNowPlaying',

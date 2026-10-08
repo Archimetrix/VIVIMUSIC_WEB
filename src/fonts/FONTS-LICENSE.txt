@@ -1,0 +1,6 @@
+Lyrics fonts bundled with Vivimusic Web (latin subset, WOFF2).
+All are licensed under the SIL Open Font License 1.1 (https://openfontlicense.org)
+and are redistributed unmodified apart from subsetting by Fontsource (https://fontsource.org).
+
+Playfair Display, Cormorant, DM Serif Display, Lora, Poppins, Montserrat,
+Outfit, Space Grotesk, Caveat, Dancing Script, Pacifico, Bebas Neue
