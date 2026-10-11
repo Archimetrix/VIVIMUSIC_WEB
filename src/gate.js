@@ -5,8 +5,9 @@
  * full-page overlay requiring the user to verify (via GitHub OAuth device
  * flow, handled in the background service worker / stargate.js) that they
  * have starred the repo. Nothing else in the extension is usable until the
- * check passes; the overlay is re-shown if a periodic recheck later finds
- * the star has been removed.
+ * check passes; the extension stays unlocked
+ * permanently once verified (no rechecks). Fresh installs get a 10-minute
+ * grace period first; updates never show the overlay.
  */
 
 (() => {
@@ -61,8 +62,8 @@
   function renderLocked() {
     const el = render(pageHtml(`
       <div class="gate-kicker">One-time community check</div>
-      <h1 class="gate-title">Unlock your music setup</h1>
-      <p class="gate-description">Vivimusic Web is free to use. Star the project on GitHub, then verify your account to unlock the extension.</p>
+      <h1 class="gate-title">Unlock Vivimusic Web for Lifetime</h1>
+      <p class="gate-description">Vivimusic Web is a 100% free extension. Please star the project on GitHub to support it, then verify your account to unlock the extension for lifetime.</p>
       <div class="gate-steps">
         <div class="gate-step"><span class="gate-step-number">01</span><span class="gate-step-label">Visit the project</span></div>
         <div class="gate-step"><span class="gate-step-number">02</span><span class="gate-step-label">Star it on GitHub</span></div>
@@ -187,11 +188,45 @@
     });
   }
 
-  chrome.runtime.sendMessage({ type: 'VIVI_STAR_GATE_STATUS' }, (res) => {
-    if (!chrome.runtime.lastError && res?.verified) {
-      window.__viviStarVerified = true;
-      return;
-    }
-    renderLocked();
-  });
+  // ---- Startup: decide whether to show the gate --------------------------
+  // Fresh installs get a 10-minute grace period (enforced in stargate.js).
+  // Once verified, the extension is unlocked forever — no rechecks.
+  let graceTimer = null;
+
+  function checkStatus(attempt = 0) {
+    chrome.runtime.sendMessage({ type: 'VIVI_STAR_GATE_STATUS' }, (res) => {
+      if (chrome.runtime.lastError || !res) {
+        // Background may still be waking up; retry briefly, then stay
+        // unlocked rather than block someone who may already be verified.
+        if (attempt < 3) setTimeout(() => checkStatus(attempt + 1), 1000);
+        return;
+      }
+      if (res.verified) {
+        window.__viviStarVerified = true;
+        removeGate();
+        return;
+      }
+      if (res.graceMs > 0) {
+        // Still inside the 10-minute window: stay out of the way, then
+        // re-check (not just show) so a verification done elsewhere wins.
+        clearTimeout(graceTimer);
+        graceTimer = setTimeout(() => checkStatus(), res.graceMs + 500);
+        return;
+      }
+      renderLocked();
+    });
+  }
+
+  // If the user verifies in another music.youtube.com tab, unlock this one too.
+  try {
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area === 'local' && changes.vivi_star_gate?.newValue?.verified) {
+        stopPolling();
+        clearTimeout(graceTimer);
+        removeGate();
+      }
+    });
+  } catch { /* storage events unavailable; harmless */ }
+
+  checkStatus();
 })();

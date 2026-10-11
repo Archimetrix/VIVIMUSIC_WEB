@@ -6,6 +6,10 @@
  * (as opposed to just typing a username), then checks GET /user/starred/{owner}/{repo}
  * with their own token — the authoritative "did *this* account star it" check.
  *
+ * Policy: fresh installs get a 10-minute grace period; after that the user
+ * verifies once and the extension is unlocked permanently. No rechecks, and
+ * extension updates never trigger verification.
+ *
  * IMPORTANT: replace GITHUB_CLIENT_ID below with your own GitHub App's client_id.
  * Create it at https://github.com/settings/apps -> New GitHub App -> enable
  * "Device Flow" under Optional features. No client_secret is needed for this flow.
@@ -16,9 +20,11 @@
 const GITHUB_CLIENT_ID = 'Iv23liMZvwMUxc2HJIso';
 const STAR_REPO_OWNER = 'Archimetrix';
 const STAR_REPO_NAME = 'VIVIMUSIC_WEB';
-const STAR_RECHECK_TTL_MS = 7 * 24 * 60 * 60 * 1000; // treat verification as fresh for 1 week
-const STAR_GATE_ALARM_NAME = 'vivi_star_gate_weekly_recheck';
-const STAR_GATE_ALARM_PERIOD_MIN = 7 * 24 * 60; // 1 week, matches the TTL above
+// Fresh installs get this long to use the extension before the star screen
+// appears. Updates (manual or automatic from the add-on store) never see it.
+const STAR_GRACE_MS = 10 * 60 * 1000;
+const STAR_INSTALL_KEY = 'vivi_install_time';
+const STAR_OLD_ALARM_NAME = 'vivi_star_gate_weekly_recheck'; // removed; cleaned up on update
 
 async function starGateGetState() {
   const { vivi_star_gate } = await chrome.storage.local.get('vivi_star_gate');
@@ -76,52 +82,56 @@ async function starGateCheckStarred(token) {
   throw new Error(`GitHub star check failed (${res.status})`);
 }
 
-// Silent, background version of the recheck — no message round-trip to a
-// content script, so it runs even if no VIVIMUSIC tab happens to be open.
-// It only ever *updates stored state*; it never shows the gate UI itself.
-// gate.js re-shows the overlay on its own the next time it runs
-// VIVI_STAR_GATE_STATUS and finds verified === false (e.g. the user
-// unstarred the repo since we last checked).
-async function starGateBackgroundRecheck() {
-  const state = await starGateGetState();
-  if (!state?.token) return; // never verified yet, nothing to recheck
+// Verification is permanent: once a user has verified, the extension stays
+// unlocked forever. There is no periodic recheck and no alarm.
+
+// Install bookkeeping. 'install' starts the 10-minute grace clock; 'update'
+// (including automatic add-on-store updates) unlocks permanently so existing
+// users are never asked to verify.
+async function starGateOnInstalled(details) {
   try {
-    const starred = await starGateCheckStarred(state.token);
-    await starGateSetState({ ...state, verified: starred, verifiedAt: Date.now() });
+    if (details?.reason === 'install') {
+      await chrome.storage.local.set({ [STAR_INSTALL_KEY]: Date.now() });
+    } else if (details?.reason === 'update') {
+      const state = await starGateGetState();
+      if (!state?.verified) {
+        await starGateSetState({ verified: true, verifiedAt: Date.now(), grandfathered: true });
+      } else if (state.token) {
+        const { token, ...rest } = state; // token is no longer needed once verified
+        await starGateSetState(rest);
+      }
+    }
+    // Clean up the weekly recheck alarm left behind by older versions.
+    await chrome.alarms.clear(STAR_OLD_ALARM_NAME);
   } catch (e) {
-    // Network hiccup / expired token: leave the stored state as-is. If it's
-    // a real expiry, the TTL will lapse on its own and the user re-verifies
-    // next time the gate check runs in a tab.
-    console.debug('[ViVi Star Gate] background recheck failed:', e?.message);
+    console.debug('[ViVi Star Gate] onInstalled failed:', e?.message);
   }
 }
+chrome.runtime.onInstalled.addListener(starGateOnInstalled);
+try { chrome.alarms.clear(STAR_OLD_ALARM_NAME); } catch { /* ignore */ }
 
-function starGateEnsureAlarm() {
-  chrome.alarms.get(STAR_GATE_ALARM_NAME, (existing) => {
-    if (!existing) {
-      chrome.alarms.create(STAR_GATE_ALARM_NAME, { periodInMinutes: STAR_GATE_ALARM_PERIOD_MIN });
-    }
-  });
+// Returns { verified, graceMs }. graceMs > 0 means "not verified yet, but
+// still inside the grace window — don't show the gate for this many ms".
+async function starGateStatus() {
+  const state = await starGateGetState();
+  if (state?.verified) return { verified: true, graceMs: 0 };
+  let { [STAR_INSTALL_KEY]: installedAt } = await chrome.storage.local.get(STAR_INSTALL_KEY);
+  if (!installedAt) {
+    // No install time recorded (e.g. the status query beat onInstalled).
+    // Start the clock now rather than risk locking someone out immediately.
+    installedAt = Date.now();
+    await chrome.storage.local.set({ [STAR_INSTALL_KEY]: installedAt });
+  }
+  const graceMs = Math.max(0, installedAt + STAR_GRACE_MS - Date.now());
+  return { verified: false, graceMs };
 }
-
-// Belt-and-suspenders, same reasoning as the update-check alarm in
-// background.js: register on install/startup, and also right away in case
-// this particular service-worker wake-up wasn't triggered by either event.
-chrome.runtime.onInstalled.addListener(starGateEnsureAlarm);
-chrome.runtime.onStartup.addListener(starGateEnsureAlarm);
-starGateEnsureAlarm();
-
-chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === STAR_GATE_ALARM_NAME) starGateBackgroundRecheck();
-});
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   switch (msg?.type) {
     case 'VIVI_STAR_GATE_STATUS':
-      starGateGetState().then((state) => {
-        const fresh = !!state?.verified && (Date.now() - (state.verifiedAt || 0) < STAR_RECHECK_TTL_MS);
-        sendResponse({ verified: fresh });
-      });
+      starGateStatus()
+        .then((st) => sendResponse(st))
+        .catch(() => sendResponse({ verified: true, graceMs: 0 })); // never lock on an internal error
       return true;
 
     case 'VIVI_STAR_GATE_START_AUTH':
@@ -136,7 +146,9 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           if (result.status === 'success') {
             try {
               const starred = await starGateCheckStarred(result.token);
-              await starGateSetState({ verified: starred, verifiedAt: Date.now(), token: result.token });
+              await starGateSetState(starred
+                ? { verified: true, verifiedAt: Date.now() }
+                : { verified: false, token: result.token });
               sendResponse({ status: 'success', starred });
             } catch (e) {
               sendResponse({ status: 'error', error: e.message });
@@ -148,13 +160,14 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         .catch((e) => sendResponse({ status: 'error', error: e.message }));
       return true;
 
+    // Only used by the "I've starred it — check again" button; never automatic.
     case 'VIVI_STAR_GATE_RECHECK':
       (async () => {
         const state = await starGateGetState();
         if (!state?.token) { sendResponse({ ok: false, error: 'not_authenticated' }); return; }
         try {
           const starred = await starGateCheckStarred(state.token);
-          await starGateSetState({ ...state, verified: starred, verifiedAt: Date.now() });
+          if (starred) await starGateSetState({ verified: true, verifiedAt: Date.now() });
           sendResponse({ ok: true, starred });
         } catch (e) {
           sendResponse({ ok: false, error: e.message });
