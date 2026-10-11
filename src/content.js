@@ -771,6 +771,7 @@
   // more reliable than an event listener given how deep YouTube Music nests
   // its player DOM.
   function sponsorSkipLoop() {
+    if (!sponsorSegments.length) { setTimeout(sponsorSkipLoop, 250); return; }
     requestAnimationFrame(sponsorSkipLoop);
     checkSponsorSkip();
   }
@@ -2067,7 +2068,7 @@
   // the user's actual toggle state separately so route changes can gate the
   // *effective* on/off state without losing what the person picked in settings.
   let kawarpUserEnabled = true;
-  let eqUserEnabled = true;
+  let eqUserEnabled = false;
   function updateKawarpVisibility() {
     const active = isMainPlayerPageActive();
     window.__viviKawarp?.setEnabled(kawarpUserEnabled && active);
@@ -2075,6 +2076,7 @@
     // (including the immediate MutationObserver added above) so the EQ
     // toggle button disappears the instant the player is minimized too,
     // instead of staying visible over Home/Explore/etc.
+    window.__viviEqualizer?.setAllowed(eqUserEnabled);
     window.__viviEqualizer?.setVisible(eqUserEnabled && active);
   }
 
@@ -2760,7 +2762,7 @@
 
   chrome.storage.local.get({
     enabled: true, themeEnabled: true, imageOnlyMode: false, spotifyCanvasEnabled: true, canvasPriority: 'apple', sponsorBlockEnabled: true,
-    kawarpEnabled: true, kawarpPauseWhenInactive: true, eqEnabled: true,
+    kawarpEnabled: true, kawarpPauseWhenInactive: true, eqEnabled: false,
     kawarpWarpIntensity: 1.0, kawarpBlurPasses: 5, kawarpAnimationSpeed: 4.15,
     kawarpTransitionDuration: 0, kawarpSaturation: 2.6, kawarpDithering: 0.034, kawarpOpacity: 1.0, kawarpBrightness: 0.5,
   }, ({
@@ -2788,7 +2790,7 @@
     });
     window.__viviKawarp?.setPauseWhenInactive(kwPause !== false);
     kawarpUserEnabled = kwEnabled !== false;
-    eqUserEnabled = eqEnabled_ !== false;
+    eqUserEnabled = eqEnabled_ === true;
     updateKawarpVisibility();
     // Pre-create the background element immediately
     if (themeEnabled) ensureBgEl();
@@ -3109,7 +3111,7 @@
         updateKawarpVisibility();
       }
       if ('eqEnabled' in msg) {
-        eqUserEnabled = msg.eqEnabled !== false;
+        eqUserEnabled = msg.eqEnabled === true;
         updateKawarpVisibility();
       }
       if ('kawarpPauseWhenInactive' in msg) {

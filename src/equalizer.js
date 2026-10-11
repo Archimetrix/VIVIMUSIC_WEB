@@ -113,7 +113,7 @@
     }
 
     try {
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'playback' });
       sourceNode = audioCtx.createMediaElementSource(video);
       video.dataset.viviEqBound = '1';
 
@@ -187,6 +187,7 @@
   }
 
   function applySettingsToGraph() {
+    if (!audioCtx && settings.enabled) ensureGraph(findVideo());
     if (!audioCtx) return;
     const now = audioCtx.currentTime;
     const ramp = 0.05; // seconds, avoids audible zipper/clicks on slider drag
@@ -290,6 +291,9 @@
     try {
       chrome.storage.local.get({ [STORAGE_KEY]: DEFAULT_SETTINGS }, (res) => {
         settings = { ...DEFAULT_SETTINGS, ...(res[STORAGE_KEY] || {}) };
+        // Always start OFF: audio is only processed after the user presses the
+        // power button / a preset on the in-player EQ panel in this session.
+        settings.enabled = false;
         cb?.();
       });
     } catch (e) {
@@ -304,7 +308,7 @@
 
   function pollForVideo() {
     const video = findVideo();
-    if (video && (boundVideo !== video)) {
+    if (video && (boundVideo !== video) && settings.enabled) {
       ensureGraph(video);
     }
   }
@@ -607,7 +611,16 @@
     }
   }
 
-  window.__viviEqualizer = { setVisible };
+  // Called when the extension-panel EQ switch changes. Turning it off also
+  // switches processing off (bypass) so no EQ audio work continues.
+  function setAllowed(allowed) {
+    if (allowed || !settings.enabled) return;
+    settings.enabled = false;
+    try { syncUIFromSettings(); } catch (e) { /* UI not built yet */ }
+    applySettingsToGraph();
+  }
+
+  window.__viviEqualizer = { setVisible, setAllowed };
 
   function init() {
     loadSettings(() => {

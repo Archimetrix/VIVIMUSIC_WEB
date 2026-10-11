@@ -8,7 +8,13 @@
   }
   function context() {
     const c = cfg('INNERTUBE_CONTEXT');
-    if (c && typeof c === 'object') return structuredClone(c);
+    if (c && typeof c === 'object') {
+      const ctx = structuredClone(c);
+      // Brand-account sessions: make sure requests act on the active account.
+      const delegated = cfg('DELEGATED_SESSION_ID');
+      if (delegated) { ctx.user = ctx.user || {}; if (!ctx.user.onBehalfOfUser) ctx.user.onBehalfOfUser = delegated; }
+      return ctx;
+    }
     return { client: { clientName: cfg('INNERTUBE_CLIENT_NAME', 'WEB_REMIX'), clientVersion: cfg('INNERTUBE_CLIENT_VERSION', '1.20260901.01.00'), hl: navigator.language || 'en-US', gl: 'US' } };
   }
   async function sha1(text) {
@@ -35,6 +41,11 @@
     const headers = {'Content-Type':'application/json','Accept':'application/json'};
     const auth = await authHeader();
     if (auth) headers.Authorization = auth;
+    // Same identity headers the YouTube Music web client sends, so requests
+    // go to the account currently active in the tab (not just Google account #0).
+    const authUser = cfg('SESSION_INDEX'); if (authUser !== null && authUser !== undefined && authUser !== '') headers['X-Goog-AuthUser'] = String(authUser);
+    const pageId = cfg('DELEGATED_SESSION_ID'); if (pageId) headers['X-Goog-PageId'] = String(pageId);
+    headers['X-Origin'] = location.origin;
     const r = await fetch(`${location.origin}/youtubei/v1/${endpoint}?key=${encodeURIComponent(key)}`, {method:'POST',credentials:'include',headers,body:JSON.stringify(body),cache:'no-store'});
     // One retry only on a transient failure (429/5xx) — enough to ride out a
     // brief hiccup without meaningfully slowing down the normal case, where
@@ -104,11 +115,37 @@
     }
     return added;
   }
+  const rt = x => x?.runs?.map(r=>r?.text||'').join('') || x?.simpleText || '';
+  function findKey(n, key, depth = 0) {
+    if (!n || typeof n !== 'object' || depth > 12) return null;
+    if (n[key]) return n[key];
+    for (const v of Object.values(n)) { const r = findKey(v, key, depth + 1); if (r) return r; }
+    return null;
+  }
+  // Ask YouTube Music which account the session is actually acting as.
+  // This is the same server-side truth that playlists get created under.
+  async function accountInfo() {
+    const out = { name: '', email: '', handle: '', photo: '', key: '' };
+    try {
+      const d = await ytmFetch('account/account_menu', { context: context() });
+      const h = findKey(d, 'activeAccountHeaderRenderer');
+      if (h) {
+        out.name = rt(h.accountName);
+        out.email = rt(h.email);
+        out.handle = rt(h.channelHandle);
+        const th = h.accountPhoto?.thumbnails || [];
+        out.photo = th.length ? th[th.length - 1].url || '' : '';
+      }
+    } catch {}
+    const sync = String(cfg('DATASYNC_ID') || cfg('DELEGATED_SESSION_ID') || '');
+    out.key = [sync, out.email, out.handle, out.name, cfg('SESSION_INDEX') ?? ''].join('|');
+    return out;
+  }
   async function ready(){
     if(!location.hostname.includes('music.youtube.com')) throw new Error('Open YouTube Music first.');
     if(!cfg('INNERTUBE_API_KEY')) throw new Error('YouTube Music is still loading. Reload the tab and retry.');
     if(!await authHeader()) throw new Error('YouTube Music login session not visible. Sign in to YouTube Music and retry.');
-    return {ok:true,title:document.title||'YouTube Music'};
+    return {ok:true,title:document.title||'YouTube Music',account:await accountInfo()};
   }
   window.addEventListener('message', async ev=>{
     if(ev.source!==window || ev.data?.source!=='VIVI_YTM_TRANSFER_CONTENT') return;

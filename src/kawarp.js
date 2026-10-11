@@ -1,3 +1,4 @@
+/* Based on @kawarp/core (modified) | Copyright (c) 2026 Better Lyrics | MIT | https://github.com/better-lyrics/kawarp | see THIRD_PARTY_NOTICES.md */
 /**
  * Kawarp - Fluid Animated Background Renderer
  *
@@ -11,6 +12,13 @@
  */
 // Size for blur operations (small = fast)
 const BLUR_SIZE = 128;
+// The domain-warp pass only ever samples the 128x128 blurred album texture, so
+// its output is inherently low-frequency. Rendering it at 1/4 of the window
+// size (never below WARP_MIN px) is visually lossless; the full-resolution
+// output pass then bilinear-upsamples it and still adds the dithering grain
+// per real screen pixel.
+const WARP_SCALE = 0.25;
+const WARP_MIN = 256;
 const VERTEX_SHADER = `
   attribute vec2 a_position;
   attribute vec2 a_texCoord;
@@ -143,6 +151,7 @@ const OUTPUT_SHADER = `
   uniform float u_time;
   uniform float u_scale;
   uniform float u_opacity;
+  uniform float u_brightness;
   uniform vec2 u_resolution;
   varying vec2 v_texCoord;
 
@@ -168,6 +177,10 @@ const OUTPUT_SHADER = `
     highp vec2 pixelPos = floor(v_texCoord * u_resolution);
     highp float noise = hash(vec3(pixelPos, floor(u_time * 60.0)));
     color.rgb += (noise - 0.5) * u_dithering;
+    // Same result as the old CSS filter:brightness() on the canvas: clamp to the
+    // displayable range first, then scale. Doing it here avoids an extra
+    // full-window compositor pass every frame.
+    color.rgb = clamp(color.rgb, 0.0, 1.0) * u_brightness;
 
     gl_FragColor = vec4(color.rgb, color.a * u_opacity);
   }
@@ -189,6 +202,11 @@ class Kawarp {
         this.renderLoop = (timestamp) => {
             if (!this.isPlaying)
                 return;
+            // Blurred backdrop: 30fps is visually identical and halves GPU/main-thread load.
+            if (timestamp - this.lastFrameTime < 30) {
+                this.animationId = requestAnimationFrame(this.renderLoop);
+                return;
+            }
             const dt = (timestamp - this.lastFrameTime) / 1000;
             this.lastFrameTime = timestamp;
             this._animationSpeed +=
@@ -198,7 +216,20 @@ class Kawarp {
             this.animationId = requestAnimationFrame(this.renderLoop);
         };
         this.canvas = canvas;
-        const gl = canvas.getContext("webgl", { preserveDrawingBuffer: true });
+        // Context flags chosen for lowest GPU/power cost with an identical picture:
+        // - antialias:false  -> no MSAA buffer + resolve (a full-screen quad has no edges to smooth)
+        // - depth/stencil off -> no unused depth/stencil attachments
+        // - powerPreference:'low-power' -> integrated GPU on dual-GPU laptops
+        // - preserveDrawingBuffer:false -> no per-frame buffer copy; every state change
+        //   (options, new image, resize) repaints explicitly, and the last presented
+        //   frame stays on screen while the loop is paused.
+        const gl = canvas.getContext("webgl", {
+            antialias: false,
+            depth: false,
+            stencil: false,
+            powerPreference: "low-power",
+            preserveDrawingBuffer: false,
+        });
         if (!gl)
             throw new Error("WebGL not supported");
         this.gl = gl;
@@ -219,6 +250,9 @@ class Kawarp {
         this._dithering = (_h = options.dithering) !== null && _h !== void 0 ? _h : 0.008;
         this._scale = (_j = options.scale) !== null && _j !== void 0 ? _j : 1.0;
         this._opacity = options.opacity !== undefined ? options.opacity : 1.0;
+        this._brightness = options.brightness !== undefined ? Math.max(0, Math.min(2, options.brightness)) : 1.0;
+        this.warpW = 1;
+        this.warpH = 1;
         // Create shader programs
         this.blurProgram = this.createProgram(VERTEX_SHADER, KAWASE_BLUR_SHADER);
         this.blendProgram = this.createProgram(VERTEX_SHADER, BLEND_SHADER);
@@ -259,6 +293,7 @@ class Kawarp {
                 time: gl.getUniformLocation(this.outputProgram, "u_time"),
                 scale: gl.getUniformLocation(this.outputProgram, "u_scale"),
                 opacity: gl.getUniformLocation(this.outputProgram, "u_opacity"),
+                brightness: gl.getUniformLocation(this.outputProgram, "u_brightness"),
                 resolution: gl.getUniformLocation(this.outputProgram, "u_resolution"),
             },
         };
@@ -358,6 +393,12 @@ class Kawarp {
     set opacity(value) {
         this._opacity = Math.max(0, Math.min(1, value));
     }
+    get brightness() {
+        return this._brightness;
+    }
+    set brightness(value) {
+        this._brightness = Math.max(0, Math.min(2, value));
+    }
     setOptions(options) {
         if (options.warpIntensity !== undefined)
             this.warpIntensity = options.warpIntensity;
@@ -379,6 +420,12 @@ class Kawarp {
             this.scale = options.scale;
         if (options.opacity !== undefined)
             this.opacity = options.opacity;
+        if (options.brightness !== undefined)
+            this.brightness = options.brightness;
+        // While the loop is stopped (paused tab, etc.) nothing would redraw, so a
+        // live slider change would not show until the next start(). Repaint once.
+        if (!this.isPlaying && this.hasImage)
+            this.renderFrame(this.accumulatedTime);
     }
     getOptions() {
         return {
@@ -392,6 +439,7 @@ class Kawarp {
             dithering: this._dithering,
             scale: this._scale,
             opacity: this._opacity,
+            brightness: this._brightness,
         };
     }
     // Image loading methods
@@ -524,17 +572,23 @@ class Kawarp {
     resize() {
         const width = this.canvas.width;
         const height = this.canvas.height;
-        // Only warpFBO needs to be canvas size
+        // warpFBO is intentionally smaller than the canvas (see WARP_SCALE).
+        this.warpW = Math.max(1, Math.min(width, Math.max(Math.ceil(width * WARP_SCALE), WARP_MIN)));
+        this.warpH = Math.max(1, Math.min(height, Math.max(Math.ceil(height * WARP_SCALE), WARP_MIN)));
         if (this.warpFBO)
             this.deleteFramebuffer(this.warpFBO);
-        this.warpFBO = this.createFramebuffer(width, height, true);
+        this.warpFBO = this.createFramebuffer(this.warpW, this.warpH, true);
+        // Resizing the canvas clears it. If the loop is not running (paused tab,
+        // etc.) nothing would redraw, so repaint once to avoid a blank frame.
+        if (!this.isPlaying && this.hasImage && this.nextAlbumFBO)
+            this.renderFrame(this.accumulatedTime);
     }
     start() {
         if (this.isPlaying)
             return;
         this.isPlaying = true;
         this.lastFrameTime = performance.now();
-        requestAnimationFrame(this.renderLoop);
+        this.animationId = requestAnimationFrame(this.renderLoop);
     }
     stop() {
         this.isPlaying = false;
@@ -612,7 +666,7 @@ class Kawarp {
             gl.useProgram(this.warpProgram);
             this.setupAttributes();
             gl.bindFramebuffer(gl.FRAMEBUFFER, this.warpFBO.framebuffer);
-            gl.viewport(0, 0, width, height);
+            gl.viewport(0, 0, this.warpW, this.warpH);
             gl.activeTexture(gl.TEXTURE0);
             gl.bindTexture(gl.TEXTURE_2D, blendedTexture);
             gl.uniform1i(this.uniforms.warp.texture, 0);
@@ -631,6 +685,7 @@ class Kawarp {
             gl.uniform1f(this.uniforms.output.time, time);
             gl.uniform1f(this.uniforms.output.scale, this._scale);
             gl.uniform1f(this.uniforms.output.opacity, this._opacity);
+            gl.uniform1f(this.uniforms.output.brightness, this._brightness);
             gl.uniform2f(this.uniforms.output.resolution, width, height);
             gl.drawArrays(gl.TRIANGLES, 0, 6);
         }
@@ -639,7 +694,7 @@ class Kawarp {
             gl.useProgram(this.warpProgram);
             this.setupAttributes();
             gl.bindFramebuffer(gl.FRAMEBUFFER, this.warpFBO.framebuffer);
-            gl.viewport(0, 0, width, height);
+            gl.viewport(0, 0, this.warpW, this.warpH);
             gl.activeTexture(gl.TEXTURE0);
             gl.bindTexture(gl.TEXTURE_2D, this.nextAlbumFBO.texture);
             gl.uniform1i(this.uniforms.warp.texture, 0);
@@ -658,6 +713,7 @@ class Kawarp {
             gl.uniform1f(this.uniforms.output.time, time);
             gl.uniform1f(this.uniforms.output.scale, this._scale);
             gl.uniform1f(this.uniforms.output.opacity, this._opacity);
+            gl.uniform1f(this.uniforms.output.brightness, this._brightness);
             gl.uniform2f(this.uniforms.output.resolution, width, height);
             gl.drawArrays(gl.TRIANGLES, 0, 6);
         }

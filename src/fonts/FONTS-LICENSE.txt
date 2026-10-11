@@ -4,3 +4,5 @@ and are redistributed unmodified apart from subsetting by Fontsource (https://fo
 
 Playfair Display, Cormorant, DM Serif Display, Lora, Poppins, Montserrat,
 Outfit, Space Grotesk, Caveat, Dancing Script, Pacifico, Bebas Neue
+
+Copyright lines and the full license text for each font are in THIRD_PARTY_NOTICES.md at the root of this package.

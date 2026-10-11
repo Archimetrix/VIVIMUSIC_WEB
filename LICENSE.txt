@@ -5,3 +5,9 @@ This software and associated documentation files (the "Software") are proprietar
 No part of this Software may be reproduced, distributed, transmitted, transcribed, stored in a retrieval system, or translated into any human or computer language, in any form or by any means, without the prior written permission of the copyright owner.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+THIRD-PARTY COMPONENTS
+
+The terms above apply only to the original source code and assets of Vivimusic Web. This package also contains third-party components (hls.js, pinyin-pro, Kawarp, and the bundled lyrics fonts) that remain the property of their respective authors and are licensed under their own licenses (Apache-2.0, MIT and SIL OFL 1.1). Their copyright notices and license texts are in THIRD_PARTY_NOTICES.md, and nothing in this file restricts the rights those licenses grant for those components.
+
+Vivimusic Web also connects, at the user's request, to third-party services (including SponsorBlock, whose data is licensed under CC BY-NC-SA 4.0). Those services are not part of the Software and are governed by their own terms. See THIRD_PARTY_NOTICES.md.

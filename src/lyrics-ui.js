@@ -91,7 +91,7 @@
   }
 
   chrome.storage.local.get(
-    { lyricsEnabled: true, autoSwitchLyrics: true, lyricsShowForVideos: false, dancerOnNotFound: true, lyricsAlign: 'center', lyricsAnimationStyle: 'apple', lyricsFont: 'default' },
+    { lyricsEnabled: true, autoSwitchLyrics: true, lyricsShowForVideos: false, dancerOnNotFound: true, lyricsAlign: 'center', lyricsAnimationStyle: 'apple', lyricsFont: 'default', lyricsRoman: 'off', lyricsRomanJa: true, lyricsRomanLangs: null },
     (s) => { settings = s; applyLyricsStyleClasses(); }
   );
 
@@ -106,6 +106,13 @@
     if ('lyricsAlign' in msg) {
       settings.lyricsAlign = msg.lyricsAlign;
       applyLyricsStyleClasses();
+    }
+    if ('lyricsRoman' in msg || 'lyricsRomanJa' in msg || 'lyricsRomanLangs' in msg) {
+      if ('lyricsRoman' in msg) settings.lyricsRoman = msg.lyricsRoman;
+      if ('lyricsRomanLangs' in msg) settings.lyricsRomanLangs = msg.lyricsRomanLangs;
+      if ('lyricsRomanJa' in msg) settings.lyricsRomanJa = msg.lyricsRomanJa;
+      contentDirty = true;
+      scheduleSync();
     }
     if ('lyricsFont' in msg) {
       settings.lyricsFont = msg.lyricsFont;
@@ -728,6 +735,183 @@
     }
   }
 
+  // ── Romanization ─────────────────────────────────────────────────────────
+  // settings.lyricsRoman: 'off' | 'only' (romanized replaces the original)
+  //                       | 'both' (romanized line under each original line)
+  // The offline work lives in romanize.js; Japanese lines that contain kanji
+  // are resolved asynchronously and patched into the DOM line by line.
+  const romanCache = new WeakMap();
+
+  function flatRomanUnits(line, result) {
+    const units = [];
+    line.words.forEach((w, wi) => {
+      const gap = wi > 0 && !line.words[wi - 1].joined;
+      const parts = result.mode === 'syllable' && w.syllables && w.syllables.length ? w.syllables : [w];
+      parts.forEach((p, si) => units.push({ text: p.text, sep: si === 0 && gap ? ' ' : '' }));
+    });
+    return units;
+  }
+
+  // Online (whole-line) romaji -> per-unit text, so the word / syllable
+  // animation stays identical to the original lyrics.
+  function applyOnlineUnits(rl, line, result) {
+    const R = window.__viviRoman;
+    if (!R || !R.splitRomanByUnits || !rl.online) return;
+    if (!((result.mode === 'word' || result.mode === 'syllable') && Array.isArray(line.words) && line.words.length)) return;
+    const units = [];
+    const lastOfWord = [];
+    line.words.forEach((w) => {
+      const parts = result.mode === 'syllable' && w.syllables && w.syllables.length ? w.syllables : [w];
+      parts.forEach((p, si) => {
+        const last = si === parts.length - 1;
+        units.push({ text: p.text, snap: last && !w.joined });
+        lastOfWord.push(last);
+      });
+    });
+    const chunks = R.splitRomanByUnits(rl.online, units);
+    if (!chunks || chunks.length !== units.length) return;
+    rl.units = chunks.map((c, k) => (lastOfWord[k] || !c.spaceAfter ? c.text : c.text + ' '));
+    const wordJoined = [];
+    let k = 0;
+    line.words.forEach((w) => {
+      const parts = result.mode === 'syllable' && w.syllables && w.syllables.length ? w.syllables : [w];
+      k += parts.length;
+      wordJoined.push(!!w.joined && !chunks[k - 1].spaceAfter);
+    });
+    rl.wordJoined = wordJoined;
+  }
+
+  function getRomanView(result) {
+    const mode = settings.lyricsRoman;
+    const R = window.__viviRoman;
+    if (!mode || mode === 'off' || !R || !result || !Array.isArray(result.lines)) return null;
+    // Online lookup for kanji is automatic: it only runs for lines that get
+    // romanized, i.e. when Japanese is ticked under "Languages to romanize".
+    const jaOnline = true;
+    let langs = Array.isArray(settings.lyricsRomanLangs) ? settings.lyricsRomanLangs : null;
+    // Older versions saved "all languages" as the six original ids; treat that
+    // as "all" so the newer languages are included too.
+    if (langs && langs.length === 6 && ['ko', 'ja', 'zh', 'hi', 'pa', 'ka'].every((x) => langs.includes(x))) langs = null;
+    const sig = jaOnline + '|' + (langs ? langs.join(',') : '*');
+    const hit = romanCache.get(result);
+    if (hit && hit.sig === sig) return hit.rv;
+    const ctx = R.analyzeSong(result.lines);
+    if (langs) ctx.langs = new Set(langs);
+    let any = false;
+    const lines = result.lines.map((line) => {
+      const base = R.romanizeLine(line.text || '', ctx);
+      if (!base) {
+        // Scripts without an offline converter (Bengali, Tamil, Arabic, Cyrillic…):
+        // the Latin spelling is looked up online, line by line.
+        if (!R.onlineLangOf || !R.onlineLangOf(line.text || '', ctx)) return null;
+        any = true;
+        const orl = { src: line.text, text: '', units: null, wordJoined: null, online: null, pending: false };
+        const hit = R.getCachedJapanese(line.text);
+        if (hit) { orl.online = hit; applyOnlineUnits(orl, line, result); } else orl.pending = true;
+        return orl;
+      }
+      any = true;
+      const rl = { src: line.text, text: base.text, units: null, wordJoined: null, online: null, pending: false };
+      if (base.unresolvedHan) {
+        const cached = jaOnline ? R.getCachedJapanese(line.text) : null;
+        if (cached) { rl.online = cached; applyOnlineUnits(rl, line, result); }
+        else if (jaOnline) rl.pending = true;
+        return rl;
+      }
+      if ((result.mode === 'word' || result.mode === 'syllable') && Array.isArray(line.words) && line.words.length) {
+        const ru = R.romanizeUnits(flatRomanUnits(line, result), ctx);
+        if (ru.any && ru.units) {
+          rl.units = ru.units;
+          const chars = line.words.reduce((n, w) => n + w.text.length, 0);
+          const noSpaces = line.words.every((w, k) => w.joined || k === line.words.length - 1);
+          const spaced = ru.spaced || (noSpaces && chars / line.words.length >= 1.8);
+          rl.wordJoined = line.words.map((w) => (spaced ? false : !!w.joined));
+        }
+      }
+      return rl;
+    });
+    const rv = any ? { lines } : null;
+    romanCache.set(result, { sig, rv });
+    return rv;
+  }
+
+  function populateLine(lineEl, line, i, result, rv) {
+    const rl = rv && rv.lines[i];
+    const mode = settings.lyricsRoman;
+    const romanText = rl && !rl.pending ? (rl.online || rl.text) : null;
+    const romanOnly = mode === 'only' && !!romanText;
+    const hasWords = (result.mode === 'word' || result.mode === 'syllable') && Array.isArray(line.words) && line.words.length;
+
+    const makeUnit = (u, extra, text) => {
+      const span = document.createElement('span');
+      span.className = 'vivi-lyrics-word' + (extra ? ' ' + extra : '');
+      span.dataset.start = String(u.start);
+      span.dataset.end = String(u.end);
+      span.textContent = text != null ? text : u.text;
+      span.addEventListener('click', (e) => {
+        e.stopPropagation();
+        seekTo(u.start);
+      });
+      return span;
+    };
+
+    if (hasWords && romanOnly && !rl.units) {
+      // Line-level romanization (no per-word mapping available): one unit
+      // that spans the whole line.
+      lineEl.appendChild(makeUnit({ start: line.start, end: line.end }, '', romanText));
+    } else if (hasWords) {
+      const useRoman = romanOnly && !!rl.units;
+      let ui = 0;
+      line.words.forEach((w, wi) => {
+        const joined = useRoman && rl.wordJoined ? rl.wordJoined[wi] : w.joined;
+        if (result.mode === 'syllable') {
+          // Each word is a group; each syllable inside it is the unit
+          // that actually animates (see tick()).
+          const group = document.createElement('span');
+          group.className = 'vivi-lyrics-wordgroup'
+            + (joined ? ' vivi-lyrics-wordgroup-joined' : '')
+            + (w.bg ? ' vivi-lyrics-wordgroup-bg' : '');
+          group.dataset.start = String(w.start);
+          group.dataset.end = String(w.end);
+          (w.syllables && w.syllables.length ? w.syllables : [w]).forEach((sy) => {
+            group.appendChild(makeUnit(sy, 'vivi-lyrics-syl', useRoman ? rl.units[ui] : null));
+            ui++;
+          });
+          lineEl.appendChild(group);
+        } else {
+          lineEl.appendChild(makeUnit(w, (joined ? 'vivi-lyrics-word-joined ' : '') + (w.bg ? 'vivi-lyrics-word-bg' : ''), useRoman ? rl.units[ui] : null));
+          ui++;
+        }
+      });
+    } else {
+      lineEl.textContent = romanOnly ? romanText : line.text;
+    }
+
+    if (mode === 'both' && romanText) {
+      const sub = document.createElement('span');
+      sub.className = 'vivi-lyrics-roman';
+      sub.textContent = romanText;
+      lineEl.appendChild(sub);
+    }
+  }
+
+  function startOnlineRoman(result, rv) {
+    if (!rv || !window.__viviRoman) return;
+    rv.lines.forEach((rl, i) => {
+      if (!rl || !rl.pending || rl.requested) return;
+      rl.requested = true;
+      window.__viviRoman.romanizeJapaneseOnline(rl.src).then((res) => {
+        rl.pending = false;
+        if (res) { rl.online = res; applyOnlineUnits(rl, result.lines[i], result); }
+        if (currentResult !== result) return;
+        const el = document.querySelector('.vivi-lyrics-list .vivi-lyrics-line[data-index="' + i + '"]');
+        if (!el) return;
+        el.textContent = '';
+        populateLine(el, result.lines[i], i, result, rv);
+      });
+    });
+  }
+
   function renderPanel(result) {
     const panel = ensurePanel();
     if (!panel) return;
@@ -756,45 +940,13 @@
     list.className = 'vivi-lyrics-list';
     applyLyricsStyleClasses(list);
 
+    const romanView = getRomanView(result);
     result.lines.forEach((line, i) => {
       const lineEl = document.createElement('div');
       lineEl.className = 'vivi-lyrics-line';
       lineEl.dataset.index = String(i);
 
-      if ((result.mode === 'word' || result.mode === 'syllable') && Array.isArray(line.words) && line.words.length) {
-        const makeUnit = (u, extra) => {
-          const span = document.createElement('span');
-          span.className = 'vivi-lyrics-word' + (extra ? ' ' + extra : '');
-          span.dataset.start = String(u.start);
-          span.dataset.end = String(u.end);
-          span.textContent = u.text;
-          span.addEventListener('click', (e) => {
-            e.stopPropagation();
-            seekTo(u.start);
-          });
-          return span;
-        };
-        line.words.forEach((w) => {
-          if (result.mode === 'syllable') {
-            // Each word is a group; each syllable inside it is the unit
-            // that actually animates (see tick()).
-            const group = document.createElement('span');
-            group.className = 'vivi-lyrics-wordgroup'
-              + (w.joined ? ' vivi-lyrics-wordgroup-joined' : '')
-              + (w.bg ? ' vivi-lyrics-wordgroup-bg' : '');
-            group.dataset.start = String(w.start);
-            group.dataset.end = String(w.end);
-            (w.syllables && w.syllables.length ? w.syllables : [w]).forEach((sy) => {
-              group.appendChild(makeUnit(sy, 'vivi-lyrics-syl'));
-            });
-            lineEl.appendChild(group);
-          } else {
-            lineEl.appendChild(makeUnit(w, (w.joined ? 'vivi-lyrics-word-joined ' : '') + (w.bg ? 'vivi-lyrics-word-bg' : '')));
-          }
-        });
-      } else {
-        lineEl.textContent = line.text;
-      }
+      populateLine(lineEl, line, i, result, romanView);
       if (result.mode !== 'plain') {
         lineEl.dataset.start = String(line.start);
         lineEl.dataset.end = String(line.end);
@@ -803,6 +955,7 @@
       }
       list.appendChild(lineEl);
     });
+    startOnlineRoman(result, romanView);
 
     frag.appendChild(list);
 

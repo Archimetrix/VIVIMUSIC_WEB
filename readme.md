@@ -4,17 +4,17 @@
 
 # Vivimusic Web
 
-**Apple Music–style Canvas artwork, Spotify Canvas, synced lyrics, Last.fm scrobbling, and a Spotify → YouTube Music playlist transfer tool for YouTube Music.**
+**Apple Music–style Canvas artwork, Spotify Canvas, synced lyrics with romanization, Builtin Eq , Last.fm scrobbling, and a Spotify → YouTube Music playlist transfer tool for YouTube Music.**
 
 [![Manifest](https://img.shields.io/badge/Manifest-V3-ff6b6b?style=flat-square)](#)
-[![Version](https://img.shields.io/badge/Version-9.1.0-4ecdc4?style=flat-square)](#)
-[![Browsers](https://img.shields.io/badge/Chrome%20%7C%20Edge%20%7C%20Brave%20%7C%20Other%20Chromium%20Browsers-supported-6c5ce7?style=flat-square)](#)
+[![Version](https://img.shields.io/badge/Version-9.1.1-4ecdc4?style=flat-square)](#)
+[![Browsers](https://img.shields.io/badge/Chrome%20%7CFirefox%20%7C%20All%20Firefox%20Based%20Browsers%20%7cAll%20Chromium%20Browsers-supported-6c5ce7?style=flat-square)](#)
 [![Copyright](https://img.shields.io/badge/Copyright-%C2%A9%202026%20Archimetrix.%20All%20rights%20reserved-f39c12?style=flat-square)](LICENSE)
 </div>
 
 ---
 
-Vivimusic Web is a browser extension that reskins **[music.youtube.com](https://music.youtube.com)** with animated Canvas-style backgrounds (like Apple Music/Spotify Canvas), word-synced lyrics, an audio equalizer, Sponsorblock skipping, Last.fm scrobbling, and a dark, glassy theme — without needing a separate desktop app or a Chrome Web Store install.
+Vivimusic Web is a browser extension that reskins **[music.youtube.com](https://music.youtube.com)** with animated Canvas-style backgrounds (like Apple Music/Spotify Canvas), word-synced lyrics, an audio equalizer, SponsorBlock skipping, Last.fm scrobbling, and a dark, glassy theme — without needing a separate desktop app .
 
 This extension is **not published on the Chrome Web Store**. It's distributed as source from this repository and loaded manually as an "unpacked" extension. Follow the installation guide below — it takes about a minute.
 
@@ -40,8 +40,11 @@ This extension is **not published on the Chrome Web Store**. It's distributed as
 <a href="https://github.com/Archimetrix/VIVIMUSIC_WEB/releases" target="_blank">
     <img src="https://img.shields.io/badge/Download_ZIP-101010?style=for-the-badge&logo=github&logoColor=white" alt="Download ZIP" height="56">
   </a>
+<a href="https://addons.mozilla.org/en-US/firefox/addon/vivimusicweb/" target="_blank">
+    <img src="https://blog.mozilla.org/addons/files/2020/04/get-the-addon-fx-apr-2020.svg" alt="Get the Add-on for Firefox" height="56">
+  </a>
   
- **Note:** Currently available for only chromium browsers like chrome ,brave , opera , edge ,vivaldi etc....please use the **Download ZIP** button above and follow the quick **Local Installation** guide below.
+ **Note:** The Chromium build works on Chrome, Brave, Opera, Edge, Vivaldi and other Chromium browsers . Please use the **Download ZIP** button above and follow the quick **Local Installation** guide below.
 ---
 
 ## Table of Contents
@@ -49,14 +52,15 @@ This extension is **not published on the Chrome Web Store**. It's distributed as
 - [Watch the Extension in Action](#watch-the-extension-in-action)
 - [Features](#features)
 - [Installation Guide](#installation-guide)
-  - [Chrome / Brave / Vivaldi / Opera](#chrome--brave--vivaldi--opera)
-  - [Microsoft Edge](#microsoft-edge)
+  - [Chrome / Brave / Vivaldi / Opera](#chrome--edge--brave--vivaldi--opera)
   - [Firefox](#firefox)
 - [Updating](#updating)
 - [Settings](#settings)
 - [Spotify Canvas Login](#spotify-canvas-login)
 - [Spotify → YouTube Music Playlist Transfer](#spotify--youtube-music-playlist-transfer)
 - [Last.fm Scrobbling](#lastfm-scrobbling)
+- [SponsorBlock](#sponsorblock)
+- [Star Verification](#star-verification)
 - [Permissions & Privacy](#permissions--privacy)
 - [Troubleshooting](#troubleshooting)
 - [Credits](#credits)
@@ -66,41 +70,40 @@ This extension is **not published on the Chrome Web Store**. It's distributed as
 
 ## Features
 
-- 🎨 **Canvas Artwork** — Fetches animated, Apple Music–style Canvas videos (or high-res artwork as a fallback) for the currently playing song and blends it into the player thumbnail and page background.
+- 🎨 **Canvas Artwork** — Fetches animated, Apple Music–style Canvas videos (or high-res artwork as a fallback) for the currently playing song and blends it into the player thumbnail and page background. If a track has both Apple Music artwork and a Spotify Canvas, you choose which one is preferred.
 - 🖼️ **Spotify Canvas** — Spotify Canvas support for YT Music songs. Connect with a one-click Spotify login or by supplying your `sp_dc` cookie locally.
-- 🔄 **Spotify → YouTube Music Playlist Transfer** — Transfer your Spotify playlists directly from the browser into YouTube Music without sending your library to a VIVIMUSIC server. Select one or multiple Spotify playlists, match each track against YouTube Music, create private destination playlists, and add the matched videos while preserving playlist order.
-- 🌊 **Kawarp Background Engine** — The animated Canvas background is fully tunable from the popup: opacity, warp intensity, blur passes, saturation, dithering, animation speed, and transition duration all have live sliders, plus a "pause when inactive" toggle and a one-click **Reset to defaults** button. There's also an "artwork/image-only" mode if you'd rather skip the warped background animation entirely and just show static art.
-- 🎚️ **Built-in Equalizer** — A toggleable audio equalizer for YouTube Music playback.
-- 🎤 **Synced Lyrics** — Word-synced lyrics when available, falling back to line-synced, then plain lyrics. Pulled from multiple providers so you almost always get *something*.
-- 🔀 **Multiple Lyrics Providers** — Toggle individual sources on or off:
-  - BetterLyrics (word-sync / TTML)
-  - BetterLyrics (Kugou)
-  - BetterLyrics (Legacy)
-  - LRCLIB
-  - Spotify
-  - Musixmatch
-  - Unison
-  - BiniLyrics
-  - Lrc.red
-- 📑 **Auto-open Lyrics Tab** — Optionally jumps straight to the Lyrics tab when a track starts.
-- 🎬 **Lyrics on Video Tracks** — Toggle whether the synced lyrics panel also shows up for tracks played as music videos, not just audio-only songs.
-- 🥇 **Lyrics Provider Priority** — Reorder and prioritize which lyrics provider is tried first, with an optional "wait for priority source" toggle before falling back to others.
-- 🎶 **Lyrics Offset** — Adjust the lyrics timeline sync per-track (saved locally).
-- 🔤 **Lyrics Fonts** — Pick a font just for the lyrics lines (Playfair Display, Cormorant, DM Serif Display, Lora, Poppins, Montserrat, Outfit, Space Grotesk, Caveat, Dancing Script, Pacifico, Bebas Neue). Fonts are bundled locally, so no internet is needed, and nothing else on YouTube Music changes.
-- 💃 **REZE Dance** — An animated dancer plays when no lyrics can be found for a track, toggleable in the popup.
-- ⏭️ **Sponsorblock** — Automatically skips non-music segments (intros, sponsor spots, etc.) using Sponsorblock data.
-- 🎧 **Last.fm Scrobbling** — Logs in with your Last.fm username and password and scrobbles what you listen to, sends Now Playing status, and can sync Likes/Unlikes as Loves/Unloves on Last.fm.
-- 💾 **Local Artwork Cache** — Previously fetched artwork/Canvas videos are cached locally so repeat plays load instantly. Viewable and clearable from the popup.
+- 🔄 **Spotify → YouTube Music Playlist Transfer** — Transfer your Spotify playlists and Liked Songs directly from the browser into YouTube Music without sending your library to a VIVIMUSIC server. The transfer page shows which Spotify account and which YouTube Music account are connected, lets you search and multi-select, shows live per-playlist progress with a **Stop** button, and finishes with a results summary (links to the new playlists and a list of tracks that were not found). See [the transfer guide](#spotify--youtube-music-playlist-transfer).
 - 🎨 **THEME** — A full dark, glassy visual reskin of YouTube Music, toggleable independently of Canvas and Lyrics.
+- 🌊 **Kawarp Background Engine** — The animated Canvas background is fully tunable from the popup: opacity, warp intensity, blur passes, saturation, brightness, dithering, animation speed, and transition duration all have live sliders, plus a "pause when inactive" toggle and a one-click **Reset to defaults** button. There's also an "artwork/image-only" mode if you'd rather skip the warped background animation entirely and just show static art.
+- 🎚️ **Built-in Equalizer** — A toggleable 3-band equalizer (low / mid / high) with a room-reverb send and one-click presets (Bass Boost, Clear Vocals, Empty Room), available from the full player screen.
+- 🎤 **Synced Lyrics** — Syllable-synced lyrics when available, then word-synced, then line-synced, then plain lyrics. Pulled from multiple providers so you almost always get *something*.
+- 🔀 **Multiple Lyrics Providers** — Toggle individual sources on or off:
+  - lrc.red
+  - Better Lyrics (word/syllable-sync, TTML)
+  - Better Lyrics Unison
+  - Better Lyrics Portato
+  - Better Lyrics Legato (Kugou)
+  - Better Lyrics Legacy
+  - BiniLyrics
+  - Musixmatch
+  - LRCLIB
+  - Spotify (needs a connected Spotify account)
+- 🔠 **Lyrics Romanization** — Show lyrics in Latin letters, written the way they sound (not translated), either instead of the original or as a small line under each original line. Korean, Japanese kana, Chinese (pinyin), Hindi, Punjabi and Georgian are converted on-device. Other scripts (for example Japanese kanji, Arabic, Cyrillic, Greek, Thai and several Indic scripts) are looked up through Google Translate only if you tick them, and only the lyric text is sent. You choose which languages are romanized.
+- ✨ **Lyrics Alignment & Highlight Animations** — Align lyrics left, center or right, and pick the current-word animation: Fill sweep, Glow up, Word bounce, Smooth zoom, or Apple Music style.
+- 💃 **REZE Dance** — An animated dancer plays when no lyrics can be found for a track, toggleable in the popup.
+- ⏭️ **SponsorBlock** — Automatically skips non-music segments (spoken intros, skits, outros) of music videos using community data from [SponsorBlock](https://sponsor.ajay.app/), and keeps the lyrics timeline in sync after each skip. See [SponsorBlock](#sponsorblock) for how it works and the required attribution.
+- 🎧 **Last.fm Scrobbling** — Sign in through Last.fm's browser authorization page (or with username and password), scrobble what you listen to, send Now Playing status, and sync Likes/Unlikes as Loves/Unloves.
+- 💾 **Local Artwork Cache** — Previously fetched artwork/Canvas links are cached locally so repeat plays load instantly. View, search, preview, export, import and clear them from the popup.
+- ⌨️ **Cache Overlay Shortcut** — Press **Alt+C** on the YouTube Music tab to see the artwork cache and the current track's live cache status without opening the popup.
 - 🔔 **Update Checker** — Since this isn't on the Web Store, the popup can check this GitHub repo's [Releases](../../releases) page and let you know when a newer version is out. It does not auto-install updates.
 
 ---
 
 ## Installation Guide
 
-> Because this extension isn't listed on any extension store, your browser will warn you that it's an "unpacked" / "developer mode" extension. That's expected and normal — it just means you installed it from source instead of a store.
+> Because this extension isn't listed on Chrome webstore , your browser will warn you that it's an "unpacked" / "developer mode" extension. That's expected and normal — it just means you installed it from source instead of a store.
 
-### Chrome / Brave / Vivaldi / Opera
+### Chrome / Edge / Brave / Vivaldi / Opera /Other all Chromium Browsers
 
 1. **Download The Zipfile From Releases**
 2. **Extract it** to a folder you won't move or delete later (e.g. `Documents/Vivimusic Web`). Chrome loads the extension directly from this folder, so if you delete it, the extension breaks.
@@ -108,7 +111,7 @@ This extension is **not published on the Chrome Web Store**. It's distributed as
    ```
    chrome://extensions
    ```
-   (For Brave: `brave://extensions` · For Vivaldi: `vivaldi://extensions` · For Opera: `opera://extensions`)
+   (For Edge: `edge://extensions` · For Brave: `brave://extensions` · For Vivaldi: `vivaldi://extensions` · For Opera: `opera://extensions`)
 4. Turn on **Developer mode** — the toggle is in the top-right corner of the extensions page.
 5. Click **Load unpacked**.
 6. Select the folder you extracted and open the folder you will see icon and src folder when you see these two folders dont click on them just click open to select (the one that directly contains `manifest.json`).
@@ -119,12 +122,13 @@ This extension is **not published on the Chrome Web Store**. It's distributed as
 
 ### Firefox
 
-Currently only chromium browsers are supported .. it will not work on firefox .
+Firefox addon is currently available in official firefox addon store install the extension directly from there .
+
 ---
 
 ## Updating
 
- To update Vivimusic Web:
+ To update Vivimusic Web **For Chromium Builds Specially** :
 
 1. Open the extension popup — if a newer version is available, you'll see an **"Update available"** notice (checked automatically twice a day, or manually via **Check for updates** in the popup).
 2. Download the latest release from the [Releases page](../../releases) (or pull the latest `main` branch).
@@ -139,28 +143,33 @@ All settings live in the extension popup (click the Vivimusic icon in your toolb
 
 | Setting | What it does |
 |---|---|
-| **Enable Canvas** | Turns the animated artwork/background feature on or off. |
-| **Image only** | Shows static artwork instead of the animated warped Canvas background. |
-| **Kawarp background** | Enables the animated warp effect, with an expandable panel of fine-tuning sliders: opacity, warp intensity, blur passes, saturation, dithering, animation speed, transition duration, plus a "pause when inactive" toggle and a **Reset to defaults** button. |
-| **Equalizer** | Turns the built-in audio equalizer on or off. |
+| **Apple Music Animated Artwork** | Turns the animated artwork/background feature on or off. |
+| **Image-only mode** | Shows static artwork instead of the animated looping Canvas video (less data and CPU). |
+| **Fluid Background (Kawarp)** | Enables the animated warp effect, with an expandable panel of fine-tuning sliders: opacity, warp intensity, blur passes, saturation, brightness, dithering, animation speed, transition duration, plus a "pause when inactive" toggle and a **Reset to defaults** button. |
+| **Equalizer** | Shows or hides the floating equalizer button on the full player screen. |
 | **Synced Lyrics** | Turns the custom lyrics panel on or off. |
 | **Auto-open Lyrics tab** | Automatically switches to the Lyrics tab when a new track starts. |
-| **Lyrics on video tracks** | Shows the synced lyrics panel for tracks played as music videos, not just audio. |
+| **Romanization** | Off, Romanized only, or Original + romanized. |
+| **Languages to romanize** | Choose which scripts are romanized (all, none, or individual languages). |
+| **Lyrics alignment** | Left, Center or Right. |
+| **Highlight animation** | Fill sweep, Glow up, Word bounce, Smooth zoom or Apple Music. |
 | **Lyrics font** | Changes the font of the lyrics lines only. Lyrics in scripts a font doesn't cover (Hindi, Bengali, Korean…) fall back to the default font. |
-| **REZE Dance on no lyrics found** | Plays the animated dancer when no lyrics can be found for a track. |
-| **Sponsorblock** | Automatically skips non-music segments using Sponsorblock data. |
-| **Lyrics providers** | Toggle individual lyrics sources on/off, in priority order. |
-| **Prioritize provider** | Enables custom lyrics provider priority ordering, with a "wait for priority source" toggle. |
-| **THEME** | Toggles the full visual reskin independently of Canvas/Lyrics. |
+| **Show lyrics for video songs** | Shows the synced lyrics panel for tracks played as music videos, not just audio. |
+| **Show dancer when no lyrics found** | Plays the animated dancer when no lyrics can be found for a track. |
+| **Skip non-music sections (SponsorBlock)** | Automatically skips non-music segments using SponsorBlock data. |
+| **Lyrics providers** | Toggle individual lyrics sources on/off. |
+| **Customize provider priority** | Enables custom priority ordering (1st / 2nd / 3rd), with a "wait for priority source" toggle. |
+| **Theme** | Toggles the full visual reskin independently of Canvas/Lyrics. |
 | **Spotify Canvas** | Enables Spotify Canvas videos for YT Music tracks; connect via login or `sp_dc` cookie. |
-| **Spotify → YouTube Music** | Opens the client-side Spotify playlist transfer tool. Select one or multiple normal Spotify playlists and transfer them into private YouTube Music playlists. Spotify Liked Songs are not currently supported. |
+| **When both are available, prefer** | Chooses Apple Music artwork or Spotify Canvas when a track has both. |
+| **Playlist transfer** | Opens the client-side Spotify → YouTube Music transfer tool (Beta). Select playlists and/or Liked Songs and transfer them into private YouTube Music playlists. |
 | **Last.fm scrobbling** | Turns Last.fm integration on or off entirely. |
 | **Send Now Playing** | Sends a "Now Playing" update to Last.fm as soon as a track starts. |
 | **Send Likes/Unlikes** | Mirrors the YouTube Music like button to Last.fm Love/Unlove. |
 | **Min. song length (sec)** | Tracks shorter than this are never scrobbled. |
 | **Scrobble delay (%)** | Scrobble once this percentage of the track has played. |
 | **Scrobble delay (min)** | Or once this many minutes have played — whichever threshold is reached first. |
-| **Artwork Cache** | Shows how many songs are cached locally, with a one-click **Clear all**. |
+| **Artwork Cache** | Shows how many songs are cached locally, with search, preview, **Export**, **Import** and a one-click **Clear all**. |
 | **Check for updates** | Manually checks this repo's latest release against your installed version. |
 
 ---
@@ -172,7 +181,7 @@ To get Spotify Canvas videos on YouTube Music tracks, connect a Spotify account 
 1. **Connect Spotify** — click the button and log in normally.
 2. **Paste `sp_dc` cookie** — if the one-click login doesn't work for your browser (this is common on **Brave**, due to its cookie/shield handling), paste your Spotify `sp_dc` cookie value into the field and click **Save sp_dc locally**. It's stored locally in your browser only.
 
-If you're on Brave and hitting login issues, click the **"Using Brave Browser?"** info button in the popup for a step-by-step fix guide built into the extension.
+
 
 Once connected, you'll see your connected account shown in the popup with a **Disconnect Spotify** option to revoke access at any time.
 
@@ -181,16 +190,22 @@ Once connected, you'll see your connected account shown in the popup with a **Di
 
 ## Spotify → YouTube Music Playlist Transfer
 
-Vivimusic Web can transfer normal Spotify playlists into YouTube Music directly from your browser. The transfer runs client-side: playlist metadata and track information are processed by the extension in your browser, and the extension talks directly to Spotify and YouTube Music using the sessions you already have open.
+Vivimusic Web can transfer Spotify playlists and your Liked Songs into YouTube Music directly from your browser. The transfer runs client-side: playlist metadata and track information are processed by the extension in your browser, and the extension talks directly to Spotify and YouTube Music using the sessions you already have open.
 
 ### What it supports
 
-- Select one or multiple Spotify playlists.
-- Read the songs in each selected playlist.
+- Pick one or many Spotify playlists, or your **Liked Songs**, with a search box and **Select all / Clear** buttons. The action bar shows how many playlists and tracks you have selected.
+- Shows the **Spotify account** (name and profile picture) and the **YouTube Music account** (name, handle and picture) that will be used.
 - Search YouTube Music for each Spotify track using title and artist information.
-- Create a matching **private** YouTube Music playlist for each Spotify playlist.
-- Add matched YouTube Music videos in the same order as the Spotify playlist.
-- Continue through a playlist when an individual track cannot be matched, and show progress in the transfer log.
+- Create a matching **private** YouTube Music playlist for each selection and add the matched videos in the same order as the Spotify playlist. Liked Songs are created as a playlist named "Liked Songs".
+- A live progress view with an overall progress bar, matched / not-found counters, elapsed time, a status for each playlist, and an activity log.
+- A **Stop** button that ends the transfer after the current track. A playlist that was stopped before it was created is not created.
+- A results screen with a summary for each playlist, an **Open in YouTube Music** link for each new playlist, and an expandable list of tracks that could not be matched.
+- If one playlist fails, the remaining playlists continue. Playlists where nothing matched are skipped instead of creating an empty playlist.
+
+### Account safety
+
+The YouTube Music account is read from YouTube Music itself and re-checked whenever you return to the transfer page. If you switch accounts in YouTube Music, the page updates and shows a notice. The account is checked again when you press **Transfer** and before each playlist is created; if it changed mid-transfer, the transfer stops so nothing is added to the wrong account.
 
 ### What it does not require
 
@@ -224,11 +239,7 @@ The extension does not upload your Spotify library to a VIVIMUSIC backend. Spoti
 
 ### Transfer safety
 
-Keep the transfer page open until the operation finishes. Do not close the YouTube Music tab, switch apps, or intentionally interrupt the browser while matching and playlist updates are running. The current implementation uses a page bridge inside the logged-in YouTube Music tab, so keeping that environment intact reduces the chance of an interrupted transfer.
-
-### Current limitation: Spotify Liked Songs
-
-Spotify **Liked Songs** are intentionally excluded from the transfer UI. Normal Spotify playlists are supported and have been tested with the current implementation, while the Liked Songs collection is exposed differently by Spotify's internal web data model. Rather than create an unreliable or misleading transfer option, Vivimusic currently focuses on standard Spotify playlists.
+Keep the transfer page open until the operation finishes. Do not close the YouTube Music tab, switch apps, or intentionally interrupt the browser while matching and playlist updates are running. The current implementation uses a page bridge inside the logged-in YouTube Music tab, so keeping that environment intact reduces the chance of an interrupted transfer. The browser will warn you if you try to close the transfer page while a transfer is running.
 
 ---
 
@@ -236,10 +247,11 @@ Spotify **Liked Songs** are intentionally excluded from the transfer UI. Normal 
 
 Vivimusic Web can scrobble what you listen to on YouTube Music straight to your Last.fm profile.
 
-**Logging in:**
+**Logging in** — two options:
 1. Open the popup and switch on **Last.fm scrobbling**.
-2. Enter your Last.fm **username** and **password** and click **Connect Last.fm account**.
-3. Your password is sent once, directly to Last.fm's own API, and is never stored — only the session token Last.fm returns is saved locally, and it can be revoked any time from your Last.fm account's **Applications** settings without changing your password.
+2. **Sign in with Last.fm:** a Last.fm tab opens, you approve access there, and the popup shows you as connected. Your password is never entered in the extension.
+3. **Or use username & password instead:** enter your Last.fm **username** and **password** and click **Connect Last.fm account**. Your password is sent once, directly to Last.fm's own API, and is never stored.
+4. In both cases only the session token Last.fm returns is saved locally, and it can be revoked any time from your Last.fm account's **Applications** settings.
 
 **How scrobble timing works:**
 A track is scrobbled once it has played past *whichever comes first*:
@@ -253,25 +265,67 @@ When enabled, liking or unliking a song in YouTube Music sends a matching Love/U
 
 ---
 
+## SponsorBlock
+
+Vivimusic Web can skip the **non-music** parts of music videos — spoken intros, skits and outros — using community-submitted segments from [SponsorBlock](https://sponsor.ajay.app/).
+
+**How it works**
+
+- When a track starts, the extension asks SponsorBlock's API for segments in the **Non-Music** (`music_offtopic`) category with the **Skip** action only.
+- Lookups use SponsorBlock's privacy-preserving hash-prefix endpoint: only the first 4 characters of the SHA-256 hash of the video ID are sent, and the exact video is matched locally in your browser.
+- Each segment is skipped once per track. Segments longer than 2 minutes are ignored as probably mislabeled, and the synced-lyrics timeline is shifted so lyrics stay aligned after a skip.
+- Results (including "no segments found") are cached locally for 6 hours, for up to 500 videos.
+- It is controlled by **Skip non-music sections (SponsorBlock)** in the popup. When it is off, no SponsorBlock requests are made.
+- Vivimusic Web is **read-only** here: it does not submit or vote on segments. To contribute segments, use the official [SponsorBlock extension](https://sponsor.ajay.app/).
+
+**Attribution and licensing**
+
+> This product uses data from **SponsorBlock** (<https://sponsor.ajay.app/>), created by **Ajay Ramachandran** and contributors, used under the [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International license](https://creativecommons.org/licenses/by-nc-sa/4.0/).
+
+- SponsorBlock's API and database are licensed CC BY-NC-SA 4.0 unless its author gives explicit permission.
+- The SponsorBlock browser extension is licensed under GPL-3.0. **No code from the SponsorBlock extension is used in Vivimusic Web.** The small API client in `src/sponsorblock.js` is original code that only calls the public API, so Vivimusic Web's own license is unaffected.
+- SponsorBlock data is fetched live and cached locally for each user. It is not bundled with or redistributed in this package.
+- Because the data is licensed for non-commercial use, anyone who redistributes or forks this extension commercially should check SponsorBlock's license terms, or contact its author, before keeping this feature.
+
+---
+
+## Star Verification
+
+Vivimusic Web asks you to star this repository on GitHub before it unlocks. This is what the check does, so there are no surprises:
+
+- When you press the verify button, the extension uses **GitHub's OAuth Device Flow**: it shows you a short code, and you approve it on `github.com`. The extension never sees your GitHub password.
+- The resulting GitHub token is used for one thing only: asking GitHub whether your account has starred `Archimetrix/VIVIMUSIC_WEB`. It does not read your repositories, and it does not star or change anything on your behalf.
+- The token and the result are stored **locally in your browser** (extension storage). They are sent only to GitHub, never to a VIVIMUSIC server.
+
+
+---
+
 ## Permissions & Privacy
 
-Vivimusic Web only requests what it needs to function, and only runs on `music.youtube.com`:
+Vivimusic Web's content scripts only run on `music.youtube.com`. Everything else listed below is contacted by the extension's background service worker (or, for lyrics, the page script) only for the feature that needs it.
 
 | Permission | Why it's needed |
 |---|---|
-| `storage`, `unlimitedStorage` | Saves your settings and caches artwork locally, in your browser only. |
-| `activeTab`, `tabs` | Detects the current track and communicates between the popup and the YouTube Music tab. |
-| `alarms` | Schedules the twice-daily background check for new releases on GitHub. |
-| `cookies` | Used only for Spotify Canvas login (reading/managing the `sp_dc` session cookie needed to fetch Canvas videos on your behalf). |
-| Host access to `music.youtube.com` | Where the extension actually runs and injects its UI. |
-| Host access to `artwork.boidu.dev`, `lyrics-api.boidu.dev`, `lrclib.net`, `apic-desktop.musixmatch.com` | Third-party lyrics and artwork APIs used to fetch Canvas artwork and synced lyrics for the currently playing song. |
-| Host access to `open.spotify.com`, `api.spotify.com`, `api-partner.spotify.com`, `spclient.wg.spotify.com`, `apresolve.spotify.com`, `clienttoken.spotify.com`, `canvaz.scdn.co` | Spotify's own endpoints, used for Spotify Canvas and for the Spotify → YouTube Music playlist transfer. The transfer reads normal Spotify playlist data from Spotify's logged-in Web Player session. |
-| Host access to `sponsor.ajay.app` | Sponsorblock's API — used only if Sponsorblock is enabled, to fetch skip segments for the currently playing video. |
-| Host access to `song.link`, `code.thetadev.de` | Used by other Vivimusic track-resolution features. The Spotify → YouTube Music transfer itself performs its matching against YouTube Music directly. |
-| Host access to `api.github.com`, `github.com` | Used solely to check the latest release tag for the update notice — no data is sent, it's a simple read-only GET request. |
-| Host access to `ws.audioscrobbler.com` | Last.fm's API — used only if you enable and log in to Last.fm scrobbling. Sends the current artist/track (and your login once, to establish a session) directly to Last.fm; nothing is sent anywhere else. |
+| `storage`, `unlimitedStorage` | Saves your settings and caches artwork and SponsorBlock results locally, in your browser only. |
+| `activeTab`, `tabs` | Detects the current track and communicates between the popup, the transfer page and the YouTube Music tab. |
+| `alarms` | Schedules the twice-daily update check and the weekly star re-verification. |
+| `cookies` | Used only for Spotify login (reading/managing the `sp_dc` session cookie needed for Spotify Canvas, Spotify lyrics and the playlist transfer). |
+| `declarativeNetRequestWithHostAccess` | Adds the request headers (such as `Origin`/`Referer`) that Apple Music's and Spotify's web players require for the artwork, Canvas and playlist requests the extension makes on your behalf. |
+| `scripting` | Runs the YouTube Music page bridge used by the playlist transfer inside your logged-in YouTube Music tab. |
 
-Nothing is sent to a VIVIMUSIC-owned server. The extension communicates directly with the external services needed by the enabled features: Spotify, YouTube Music, artwork/lyrics providers, GitHub for the release check, Sponsorblock if enabled, and Last.fm if you opt in to scrobbling. For the Spotify → YouTube Music transfer, Spotify playlist data is read locally by the extension and YouTube Music receives the search/playlist-update requests needed to perform the transfer. No analytics, no tracking, no third-party accounts beyond Spotify and Last.fm themselves if you choose to connect them.
+| Host access | Why it's needed |
+|---|---|
+| `music.youtube.com` | Where the extension actually runs and injects its UI. |
+| `api.betterlyrics.org`, `lyrics-api.boidu.dev`, `unison.betterlyrics.org`, `unison.boidu.dev`, `lrclib.net`, `lrc.red` (and `*.lrc.red`), `apic-desktop.musixmatch.com`, `apic-appmobile.musixmatch.com`, `apic.musixmatch.com`, `www.musixmatch.com` | Lyrics providers. Also contacted for lyrics: `lyrics-api.binimum.org` (BiniLyrics). |
+| `*.apple.com`, `*.itunes.apple.com`, `*.mzstatic.com`, `*.cdn-apple.com`, `*.aaplimg.com`, `api.deezer.com` | Apple Music animated/static artwork, and ISRC lookups (Apple, with Deezer as a fallback) used to find lyrics by ISRC. |
+| `open.spotify.com`, `api.spotify.com`, `api-partner.spotify.com`, `spclient.wg.spotify.com`, `apresolve.spotify.com`, `clienttoken.spotify.com`, `canvaz.scdn.co` | Spotify's own endpoints, used for Spotify Canvas, Spotify lyrics and the Spotify → YouTube Music playlist transfer, all through your logged-in Web Player session. |
+| `code.thetadev.de` | Community-maintained Spotify web-player secrets ([ThetaDev/spotify-secrets](https://code.thetadev.de/ThetaDev/spotify-secrets)) needed to obtain a Spotify web-player session. |
+| `sponsor.ajay.app` | SponsorBlock's API — used only if SponsorBlock is enabled, to fetch skip segments for the currently playing video. |
+| `translate.googleapis.com` | Optional romanization lookups for scripts that can't be converted on-device. Used only for languages you tick, and only the lyric text is sent. |
+| `api.github.com`, `github.com`, `raw.githubusercontent.com`, `avatars.githubusercontent.com` | Update check (read-only release lookup), developer announcements (a read-only JSON file in this project's repository), and [star verification](#star-verification) (GitHub's device flow, your token, and your avatar on the verification screen). |
+| `ws.audioscrobbler.com` | Last.fm's API — used only if you enable and log in to Last.fm scrobbling. Sends the current artist/track (and your login once, to establish a session) directly to Last.fm. |
+
+Nothing is sent to a VIVIMUSIC-owned server. The extension communicates directly with the external services needed by the enabled features: Spotify, YouTube Music, Apple Music and Deezer, the lyrics providers, GitHub (updates, announcements and star verification), SponsorBlock if enabled, Google Translate if you enable romanization lookups, and Last.fm if you opt in to scrobbling. For the Spotify → YouTube Music transfer, Spotify playlist data is read locally by the extension and YouTube Music receives the search/playlist-update requests needed to perform the transfer. No analytics and no tracking.
 
 ---
 
@@ -304,8 +358,11 @@ Double-check your username and password (not your email, unless that's what you 
 **Scrobbles aren't showing up on Last.fm.**
 Check that **Last.fm scrobbling** is switched on and you're shown as connected in the popup. Remember scrobbles only send after your configured percentage/minutes threshold is reached, not the instant a song starts (that's what "Now Playing" is for).
 
-**Song/Video toggle button doesn't appear, or is in the wrong spot.**
-YouTube Music's layout changes occasionally, which can shift where this button gets injected. Open an issue with a screenshot of the player bar.
+**The GitHub star screen keeps appearing.**
+Make sure you finished approving the code on `github.com` and that you starred `Archimetrix/VIVIMUSIC_WEB` with the same GitHub account. If you un-star the repository, the screen returns at the next weekly check. Starring again and verifying once more clears it.
+
+**SponsorBlock isn't skipping anything.**
+Skipping only happens for music videos that SponsorBlock contributors have marked with Non-Music segments, so most tracks will have none. Make sure **Skip non-music sections (SponsorBlock)** is on in the popup.
 
 **Something looks visually broken after a YouTube Music redesign.**
 YouTube Music's own layout changes occasionally, which can break selectors this extension relies on. Open an issue on this repository with a screenshot and the URL/page you were on.
@@ -314,11 +371,33 @@ YouTube Music's own layout changes occasionally, which can break selectors this 
 
 ## Credits
 
+**Project**
+
 - Built and maintained by **Archimetrix**
-- Theme design foundation by **Chengggit**
-- Lyrics data via **BetterLyrics** , **[LRCLIB](https://lrclib.net)** , **Binilyrics**
-- Scrobbling powered by **[Last.fm](https://www.last.fm)**
-- And Special thanks to **[VIVIMUSIC](https://github.com/vivizzz007/vivi-music)** for Providing the Musixmatch foundation and Artwork fetching path.
+- Theme design foundation: the **"Dynamic Background"** theme by **chengggit**
+
+**Data and services**
+
+- **[SponsorBlock](https://sponsor.ajay.app/)** — non-music segment data by **Ajay Ramachandran** and contributors, used under [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/). See [SponsorBlock](#sponsorblock).
+- **Lyrics** — **[Better Lyrics](https://github.com/better-lyrics)** (BetterLyrics, Unison, Portato, Legato, Legacy), **[LRCLIB](https://lrclib.net)**, **[lrc.red](https://lrc.red)**, **BiniLyrics**, **Musixmatch**, and **Spotify**
+- **Artwork and track lookup** — **Apple Music / iTunes**, **Deezer**, and **Spotify Canvas**
+- **Scrobbling** — **[Last.fm](https://www.last.fm)**
+- **Romanization lookups** — **Google Translate**
+- **Spotify web-player secrets** — **[ThetaDev/spotify-secrets](https://code.thetadev.de/ThetaDev/spotify-secrets)**
+- Special thanks to **[VIVIMUSIC](https://github.com/vivizzz007/vivi-music)** for providing the Musixmatch foundation and artwork-fetching path.
+
+**Open-source components bundled with the extension**
+
+- **Kawarp** (fluid background engine, `@kawarp/core`) — © 2026 Better Lyrics, MIT License
+- **hls.js** — © 2017 Dailymotion, Apache License 2.0
+- **pinyin-pro** (Chinese pinyin romanization) — © 2022-present zh-lx, MIT License
+- **Lyrics fonts** — Playfair Display, Cormorant, DM Serif Display, Lora, Poppins, Montserrat, Outfit, Space Grotesk, Caveat, Dancing Script, Pacifico and Bebas Neue, SIL Open Font License 1.1, Latin subsets via [Fontsource](https://fontsource.org)
+
+Full copyright notices and license texts for the bundled components are in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+
+**Disclaimer**
+
+Vivimusic Web is an independent project and is **not affiliated with, endorsed by, or sponsored by** Google, YouTube, YouTube Music, Spotify, Apple, Last.fm, Musixmatch, Deezer, GitHub, SponsorBlock, Better Lyrics or any other service named here. All product names, logos and trademarks are the property of their respective owners.
 
 ---
 
@@ -331,3 +410,5 @@ and confidential. No part of this Software may be reproduced, distributed,
 transmitted, transcribed, stored in a retrieval system, or translated into 
 any human or computer language, in any form or by any means, without the 
 prior written permission of the copyright owner.
+
+**Third-party components.** The terms above apply only to the original code and assets of Vivimusic Web. The bundled third-party components listed under [Credits](#credits) remain under their own licenses (Apache-2.0, MIT and SIL OFL 1.1), and nothing above restricts the rights those licenses grant. Services the extension connects to — including SponsorBlock, whose data is licensed CC BY-NC-SA 4.0 — are not part of the Software and are governed by their own terms. See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).

@@ -18,6 +18,11 @@
   const BINILYRICS_BASE   = 'https://lyrics-api.binimum.org';
   const FETCH_TIMEOUT     = 9000;
   const PRIORITY_WAIT_MS  = 2000;
+  // A priority provider that only has UNSYNCED (plain) text doesn't win
+  // outright: every other provider (priority or not) gets up to this long
+  // to produce line / word / syllable sync. If none does, the plain text
+  // is shown after all. Never longer than this.
+  const UNSYNCED_UPGRADE_MS = 2000;
   // Priority OFF: the first reply is shown at once; for this long afterwards
   // later replies are compared and the best level (syllable > word > line >
   // plain) replaces it. Never longer than this.
@@ -57,22 +62,22 @@
     .filter((k, i, a) => PRIORITY_ELIGIBLE_KEYS.includes(k) && a.indexOf(k) === i)
     .slice(0, 3);
   // Defaults: lrc.red first, then BiniLyrics, then BetterLyrics (word-sync).
-  const DEFAULT_PRIORITY_ORDER = ['lrcred', 'binilyrics', 'unison'];
+  const DEFAULT_PRIORITY_ORDER = ['lrcred', 'binilyrics', 'musixmatch'];
   let priorityEnabled = true;
   let priorityOrder = DEFAULT_PRIORITY_ORDER.slice();
   // When true, a lower-priority reply waits up to PRIORITY_WAIT_MS to see if
   // a higher-priority provider is about to answer too, before committing.
   // When false, whichever of the (up to 3) priority providers answers first
   // wins outright, with no wait.
-  let priorityWaitEnabled = false;
+  let priorityWaitEnabled = true;
 
   chrome.storage.local.get(
-    { lyricsProviders: DEFAULT_PROVIDERS, lyricsPriorityEnabled: true, lyricsPriorityOrder: DEFAULT_PRIORITY_ORDER, lyricsPriorityWaitEnabled: false },
+    { lyricsProviders: DEFAULT_PROVIDERS, lyricsPriorityEnabled: true, lyricsPriorityOrder: DEFAULT_PRIORITY_ORDER, lyricsPriorityWaitEnabled: true },
     (s) => {
       providerSettings = { ...DEFAULT_PROVIDERS, ...s.lyricsProviders };
       priorityEnabled = !!s.lyricsPriorityEnabled;
       priorityOrder = sanitizeOrder(s.lyricsPriorityOrder);
-      priorityWaitEnabled = s.lyricsPriorityWaitEnabled === true;
+      priorityWaitEnabled = s.lyricsPriorityWaitEnabled !== false;
     }
   );
 
@@ -81,7 +86,7 @@
     if (msg.lyricsProviders) providerSettings = { ...providerSettings, ...msg.lyricsProviders };
     if ('lyricsPriorityEnabled' in msg) priorityEnabled = !!msg.lyricsPriorityEnabled;
     if ('lyricsPriorityOrder' in msg) priorityOrder = sanitizeOrder(msg.lyricsPriorityOrder);
-    if ('lyricsPriorityWaitEnabled' in msg) priorityWaitEnabled = msg.lyricsPriorityWaitEnabled === true;
+    if ('lyricsPriorityWaitEnabled' in msg) priorityWaitEnabled = msg.lyricsPriorityWaitEnabled !== false;
   });
 
   
@@ -785,14 +790,11 @@
   // alone and only gets tried afterward, as a fallback, if none of these
   // three come through (see fetchBestLyrics).
   //
-  // waitForBetter=true ("wait Ns for better provider"): a lower-priority
-  // reply doesn't win immediately — it starts a PRIORITY_WAIT_MS grace
-  // window so a higher-priority provider that's still in flight gets a
-  // chance to preempt it. If the #1 priority provider itself replies with
-  // a result, nothing can outrank it, so that resolves immediately with
-  // no wait. If all three settle (success or failure) before the window
-  // closes, resolution happens right away rather than sitting out the
-  // full window for nothing.
+  // waitForBetter=true ("wait 2s for best quality"): the first reply starts a
+  // PRIORITY_WAIT_MS window during which all three providers are compared
+  // by lyric quality (syllable > word > line > plain); list position only
+  // breaks ties. Finishes early on syllable sync (once no higher-priority
+  // provider could still tie it) or when all three have settled.
   //
   // waitForBetter=false: strict "whoever answers first, among these
   // three, wins" — no grace window at all.
@@ -800,9 +802,10 @@
     return new Promise((resolve) => {
       let done = false;
       let settledCount = 0;
-      let bestSoFar = null; // { value, rank } — lower rank = higher priority
+      let best = null;            // { value, rank, q }
       let graceTimer = null;
       const total = priorityJobs.length;
+      const settled = new Array(total).fill(false);
 
       const finish = (value) => {
         if (done) return;
@@ -811,32 +814,44 @@
         resolve(value || null);
       };
 
+      // Wait mode is QUALITY-first: syllable > word > line > plain. The
+      // provider's position (1st/2nd/3rd) only breaks ties between results
+      // of the same quality. Plain (unsynced) therefore loses to any synced
+      // result from any of the three.
+      const consider = (value, rank) => {
+        const q = MODE_RANK[value.mode] || 0;
+        if (!best || q > best.q || (q === best.q && rank < best.rank)) {
+          best = { value, rank, q };
+        }
+      };
+      // Only line-synced / unsynced replies are worth waiting on. As soon as
+      // any of the three returns word or syllable sync, take it right away:
+      // there is no need to wait the 2s or compare positions. (Line/plain
+      // replies keep the 2s window open to see if something better lands.)
+      const canFinishEarly = () => !!best && best.q >= MODE_RANK.word;
+
       priorityJobs.forEach((job, rank) => {
-        job.promise
-          .then((value) => {
-            settledCount++;
-            if (value) {
-              log('priority provider replied', job.key, 'rank', rank);
-              if (!waitForBetter) {
-                finish(value);
-                return;
-              }
-              if (!bestSoFar || rank < bestSoFar.rank) bestSoFar = { value, rank };
-              if (rank === 0) {
-                // Top priority itself just answered — nothing left to wait for.
-                finish(bestSoFar.value);
-                return;
-              }
-              if (!graceTimer) {
-                graceTimer = setTimeout(() => finish(bestSoFar.value), PRIORITY_WAIT_MS);
-              }
+        const onSettle = (value) => {
+          settledCount++;
+          settled[rank] = true;
+          if (value) {
+            log('priority provider replied', job.key, 'rank', rank, value.mode);
+            if (!waitForBetter) {
+              finish(value);
+              return;
             }
-            if (settledCount === total) finish(bestSoFar ? bestSoFar.value : null);
-          })
-          .catch(() => {
-            settledCount++;
-            if (settledCount === total) finish(bestSoFar ? bestSoFar.value : null);
-          });
+            consider(value, rank);
+            if (canFinishEarly()) { finish(best.value); return; }
+            if (!graceTimer) {
+              graceTimer = setTimeout(() => finish(best && best.value), PRIORITY_WAIT_MS);
+            }
+          } else if (waitForBetter && canFinishEarly()) {
+            finish(best.value);
+            return;
+          }
+          if (settledCount === total) finish(best ? best.value : null);
+        };
+        job.promise.then(onSettle).catch(() => onSettle(null));
       });
     });
   }
@@ -873,6 +888,53 @@
               if (best !== prev && typeof onUpdate === 'function') onUpdate(best);
               // Nothing outranks syllable sync — no reason to keep waiting.
               if (best.mode === 'syllable') finish();
+            }
+            if (remaining === 0) finish();
+          })
+          .catch(() => {
+            remaining--;
+            if (remaining === 0) finish();
+          });
+      });
+    });
+  }
+
+  // Priority providers answered with unsynced (plain) text only. Instead of
+  // showing it straight away, look at what ALL requested providers (priority
+  // and non-priority, they're already in flight) return for up to
+  // UNSYNCED_UPGRADE_MS and take the best synced result. Word/syllable sync
+  // ends the wait at once; a line-synced result is kept but we keep waiting
+  // out the window for something richer. Ties go to the higher-priority
+  // provider. Falls back to the plain text if nothing synced shows up.
+  function upgradeUnsynced(plainResult, jobDefs, orderedKeys) {
+    return new Promise((resolve) => {
+      let best = plainResult;
+      let bestPrio = -1;
+      let remaining = jobDefs.length;
+      let done = false;
+      const timer = setTimeout(() => finish(), UNSYNCED_UPGRADE_MS);
+
+      const finish = () => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        resolve(best);
+      };
+
+      jobDefs.forEach((job) => {
+        const prio = orderedKeys.includes(job.key) ? orderedKeys.indexOf(job.key) : 99;
+        job.promise
+          .then((value) => {
+            remaining--;
+            if (value && !done) {
+              const vr = MODE_RANK[value.mode] || 0;
+              const br = MODE_RANK[best.mode] || 0;
+              if (vr > br || (vr === br && vr > MODE_RANK.plain && prio < bestPrio)) {
+                best = value;
+                bestPrio = prio;
+                log('unsynced upgraded by', job.key, value.mode);
+              }
+              if (MODE_RANK[best.mode] >= MODE_RANK.word) finish();
             }
             if (remaining === 0) finish();
           })
@@ -939,6 +1001,10 @@
       if (orderedKeys.length) {
         const priorityJobs = orderedKeys.map((k) => jobDefs.find((j) => j.key === k));
         best = await racePriorityProviders(priorityJobs, priorityWaitEnabled);
+        if (best && best.mode === 'plain') {
+          log('priority provider gave unsynced lyrics, checking all providers for up to', UNSYNCED_UPGRADE_MS, 'ms');
+          best = await upgradeUnsynced(best, jobDefs, orderedKeys);
+        }
         if (!best) {
           // None of the prioritized providers had anything — fall back to
           // whatever the rest of the enabled providers turn up, same

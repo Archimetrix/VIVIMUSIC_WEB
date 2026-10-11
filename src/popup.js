@@ -20,6 +20,77 @@
   const videoLyricsToggle = document.getElementById('videoLyricsToggle');
   const dancerNotFoundToggle = document.getElementById('dancerNotFoundToggle');
   const lyricsAlignSelect = document.getElementById('lyricsAlignSelect');
+  const lyricsRomanSelect = document.getElementById('lyricsRomanSelect');
+  const ROMAN_LANGS = [
+    { id: 'ko', name: 'Korean' }, { id: 'ja', name: 'Japanese' }, { id: 'zh', name: 'Chinese' },
+    { id: 'hi', name: 'Hindi' }, { id: 'pa', name: 'Punjabi' }, { id: 'ka', name: 'Georgian' },
+    { id: 'bn', name: 'Bengali' }, { id: 'ta', name: 'Tamil' }, { id: 'te', name: 'Telugu' }, { id: 'gu', name: 'Gujarati' }, { id: 'kn', name: 'Kannada' }, { id: 'ml', name: 'Malayalam' }, 
+    { id: 'or', name: 'Odia' }, { id: 'si', name: 'Sinhala' }, { id: 'ar', name: 'Arabic / Urdu / Persian' }, { id: 'he', name: 'Hebrew' }, { id: 'ru', name: 'Russian / Cyrillic' }, { id: 'el', name: 'Greek' }, { id: 'th', name: 'Thai' },
+  ];
+  const romanLangsBtn = document.getElementById('romanLangsBtn');
+  const romanLangsMenu = document.getElementById('romanLangsMenu');
+  const romanLangsList = document.getElementById('romanLangsList');
+  let romanLangs = ROMAN_LANGS.map((l) => l.id);
+
+  // Two groups in the menu: languages converted on-device (reliable) and
+  // languages that are looked up online through Google (can be wrong in places).
+  const ROMAN_NATIVE = ['ko', 'ja', 'zh', 'hi', 'pa', 'ka'];
+  const ROMAN_GROUPS = [
+    { title: 'Built-in', note: 'Converted on your device', test: (id) => ROMAN_NATIVE.includes(id) },
+    { title: 'Others', note: 'Looked up via Google, can be wrong in places', test: (id) => !ROMAN_NATIVE.includes(id) },
+  ];
+
+  function paintRomanLangs() {
+    const prevScroll = romanLangsList.scrollTop;
+    romanLangsList.textContent = '';
+    ROMAN_GROUPS.forEach((g) => {
+      const head = document.createElement('div');
+      head.className = 'roman-group-head';
+      const t = document.createElement('span');
+      t.className = 'roman-group-title';
+      t.textContent = g.title;
+      const n = document.createElement('span');
+      n.className = 'roman-group-note';
+      n.textContent = g.note;
+      head.append(t, n);
+      romanLangsList.appendChild(head);
+      ROMAN_LANGS.filter((l) => g.test(l.id)).forEach((l) => paintRomanLangItem(l));
+    });
+    romanLangsList.scrollTop = prevScroll;
+    const cnt = romanLangs.length;
+    romanLangsBtn.textContent = cnt === ROMAN_LANGS.length ? 'All languages' : cnt === 0 ? 'None' : cnt + ' of ' + ROMAN_LANGS.length;
+  }
+
+  function paintRomanLangItem(l) {
+    {
+      const label = document.createElement('label');
+      label.className = 'roman-lang-item';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.value = l.id;
+      cb.checked = romanLangs.includes(l.id);
+      cb.addEventListener('change', () => {
+        romanLangs = ROMAN_LANGS.map((x) => x.id).filter((id) =>
+          id === l.id ? cb.checked : romanLangs.includes(id));
+        saveRomanLangs();
+      });
+      label.append(cb, document.createTextNode(l.name));
+      romanLangsList.appendChild(label);
+    }
+  }
+  function saveRomanLangs() {
+    paintRomanLangs();
+    chrome.storage.local.set({ lyricsRomanLangs: romanLangs });
+    relay({ lyricsRomanLangs: romanLangs });
+  }
+  romanLangsBtn.addEventListener('click', () => {
+    const open = romanLangsMenu.hidden;
+    romanLangsMenu.hidden = !open;
+    romanLangsBtn.setAttribute('aria-expanded', String(open));
+  });
+  document.getElementById('romanLangsAll').addEventListener('click', () => { romanLangs = ROMAN_LANGS.map((l) => l.id); saveRomanLangs(); });
+  document.getElementById('romanLangsNone').addEventListener('click', () => { romanLangs = []; saveRomanLangs(); });
+  paintRomanLangs();
   const lyricsAnimSelect = document.getElementById('lyricsAnimSelect');
   const lyricsFontSelect = document.getElementById('lyricsFontSelect');
   const lyricsFontPreview = document.getElementById('lyricsFontPreview');
@@ -89,8 +160,8 @@
   };
 
   chrome.storage.local.get(
-    { enabled: true, themeEnabled: true, imageOnlyMode: false, kawarpEnabled: true, eqEnabled: true, lyricsEnabled: true, autoSwitchLyrics: true, sponsorBlockEnabled: true, lyricsShowForVideos: false, dancerOnNotFound: true, lyricsAlign: 'center', lyricsAnimationStyle: 'apple', lyricsFont: 'default', lyricsProviders: DEFAULT_PROVIDERS, ...KAWARP_DEFAULTS },
-    ({ enabled, themeEnabled, imageOnlyMode, kawarpEnabled, eqEnabled, lyricsEnabled, autoSwitchLyrics, sponsorBlockEnabled, lyricsShowForVideos, dancerOnNotFound, lyricsAlign, lyricsAnimationStyle, lyricsFont, lyricsProviders,
+    { enabled: true, themeEnabled: true, imageOnlyMode: false, kawarpEnabled: true, eqEnabled: false, lyricsEnabled: true, autoSwitchLyrics: true, sponsorBlockEnabled: true, lyricsShowForVideos: false, dancerOnNotFound: true, lyricsAlign: 'center', lyricsAnimationStyle: 'apple', lyricsFont: 'default', lyricsRoman: 'off', lyricsRomanJa: true, lyricsRomanLangs: null, lyricsProviders: DEFAULT_PROVIDERS, ...KAWARP_DEFAULTS },
+    ({ enabled, themeEnabled, imageOnlyMode, kawarpEnabled, eqEnabled, lyricsEnabled, autoSwitchLyrics, sponsorBlockEnabled, lyricsShowForVideos, dancerOnNotFound, lyricsAlign, lyricsAnimationStyle, lyricsFont, lyricsRoman, lyricsRomanJa, lyricsRomanLangs, lyricsProviders,
        kawarpPauseWhenInactive, kawarpOpacity, kawarpWarpIntensity, kawarpBlurPasses, kawarpSaturation, kawarpBrightness, kawarpDithering, kawarpAnimationSpeed, kawarpTransitionDuration }) => {
       enableToggle.checked = enabled;
       imageOnlyToggle.checked = imageOnlyMode;
@@ -103,6 +174,16 @@
       videoLyricsToggle.checked = lyricsShowForVideos;
       dancerNotFoundToggle.checked = dancerOnNotFound;
       lyricsAlignSelect.value = lyricsAlign;
+      lyricsRomanSelect.value = lyricsRoman;
+      if (lyricsRomanSelect.value !== lyricsRoman) lyricsRomanSelect.value = 'off';
+      // An old saved "all six original languages" selection means "all", so the
+      // newer languages start ticked too.
+      const legacyAll = Array.isArray(lyricsRomanLangs) && lyricsRomanLangs.length === 6
+        && ['ko', 'ja', 'zh', 'hi', 'pa', 'ka'].every((x) => lyricsRomanLangs.includes(x));
+      romanLangs = Array.isArray(lyricsRomanLangs) && !legacyAll
+        ? ROMAN_LANGS.map((l) => l.id).filter((id) => lyricsRomanLangs.includes(id))
+        : ROMAN_LANGS.map((l) => l.id);
+      paintRomanLangs();
       lyricsAnimSelect.value = lyricsAnimationStyle;
       if (lyricsAnimSelect.value !== lyricsAnimationStyle) lyricsAnimSelect.value = 'apple';
       syncAlignLock();
@@ -194,11 +275,11 @@
   });
 
   chrome.storage.local.get(
-    { lyricsPriorityEnabled: true, lyricsPriorityOrder: ['lrcred', 'binilyrics', 'unison'], lyricsPriorityWaitEnabled: false },
+    { lyricsPriorityEnabled: true, lyricsPriorityOrder: ['lrcred', 'binilyrics', 'musixmatch'], lyricsPriorityWaitEnabled: true },
     ({ lyricsPriorityEnabled, lyricsPriorityOrder, lyricsPriorityWaitEnabled }) => {
       priorityEnabledToggle.checked = lyricsPriorityEnabled;
       priorityList.classList.toggle('open', lyricsPriorityEnabled);
-      priorityWaitToggle.checked = lyricsPriorityWaitEnabled === true;
+      priorityWaitToggle.checked = lyricsPriorityWaitEnabled !== false;
       populatePrioritySelects((lyricsPriorityOrder || []).filter((k) => PRIORITY_KEYS.includes(k)).slice(0, PRIORITY_SLOT_COUNT));
     }
   );
@@ -334,6 +415,13 @@
     chrome.storage.local.set({ lyricsAlign });
     relay({ lyricsAlign });
   });
+
+  lyricsRomanSelect.addEventListener('change', () => {
+    const lyricsRoman = lyricsRomanSelect.value;
+    chrome.storage.local.set({ lyricsRoman });
+    relay({ lyricsRoman });
+  });
+
 
   lyricsAnimSelect.addEventListener('change', () => {
     const lyricsAnimationStyle = lyricsAnimSelect.value;

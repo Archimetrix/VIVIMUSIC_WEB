@@ -60,7 +60,6 @@
       'display:block',
       'opacity:0',
       'transition:opacity 0.6s ease-in-out',
-      `filter:brightness(${brightness})`,
     ].join(';');
     wrapper.appendChild(el);
     return el;
@@ -68,7 +67,7 @@
 
   function sizeCanvas(el) {
     if (!el) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2); // cap DPR — this is a blurred backdrop, not detail work
+    const dpr = 1; // cap DPR — this is a blurred backdrop, not detail work
     const w = Math.max(1, Math.round(window.innerWidth * dpr));
     const h = Math.max(1, Math.round(window.innerHeight * dpr));
     if (el.width !== w || el.height !== h) {
@@ -98,6 +97,7 @@
         tintIntensity: 0.12,
         scale: 1.15,
         opacity: 1.0,
+        brightness,
       }, pendingOptions || {}));
       sizeCanvas(canvas);
       if (!resizeObserver) {
@@ -188,13 +188,13 @@
   // Called from content.js when the user changes a slider in the popup.
   function setOptions(opts) {
     if (!opts) return;
-    // Brightness isn't a Kawarp shader option — it's applied as a CSS filter
-    // on the canvas, so handle it here and keep it out of the Kawarp options.
+    // Brightness is now applied inside Kawarp's output shader (identical look to
+    // the old CSS filter, without the extra full-window compositor pass).
+    // Keep the 0.1..2 clamp used by the UI.
     const { brightness: nextBrightness, ...kawarpOpts } = opts;
     if (nextBrightness !== undefined && Number.isFinite(Number(nextBrightness))) {
       brightness = Math.max(0.1, Math.min(2, Number(nextBrightness)));
-      const el = document.getElementById(CANVAS_ID);
-      if (el) el.style.filter = `brightness(${brightness})`;
+      kawarpOpts.brightness = brightness;
     }
     pendingOptions = Object.assign({}, pendingOptions, kawarpOpts);
     kawarp?.setOptions(kawarpOpts);
@@ -302,7 +302,8 @@
     setOptions,
     setPauseWhenInactive,
     dispose,
+    version: 'optimized-1',
   };
 
-  log('ready');
+  log('ready — optimized build (warp 1/4 res, shader brightness)');
 })();

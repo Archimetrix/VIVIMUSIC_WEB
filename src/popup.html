@@ -302,6 +302,7 @@
     #canvasPrioritySelect,
     #lyricsAlignSelect,
     #lyricsAnimSelect,
+    #lyricsRomanSelect,
     #lyricsFontSelect {
       color-scheme: dark;
     }
@@ -310,6 +311,7 @@
     #canvasPrioritySelect option,
     #lyricsAlignSelect option,
     #lyricsAnimSelect option,
+    #lyricsRomanSelect option,
     #lyricsFontSelect option {
       background-color: #1c1c22;
       color: #f2f2f5;
@@ -1005,6 +1007,57 @@
       .home-card-description { margin-top: 6px; font-size: 9px; line-height: 1.25; }
     }
 
+
+    .roman-langs-btn {
+      background: rgba(255,255,255,0.06); color: var(--text-1);
+      border: 1px solid rgba(255,255,255,0.12); border-radius: 8px;
+      padding: 5px 10px; font-size: 12.5px; cursor: pointer; font-family: inherit;
+    }
+    .roman-langs-btn:hover { background: rgba(255,255,255,0.1); }
+    .roman-langs-btn::after { content: " \25BE"; opacity: .7; }
+    .roman-langs-btn[aria-expanded="true"]::after { content: " \25B4"; }
+    .roman-langs-menu {
+      margin-top: 6px; padding: 6px 10px 8px;
+      background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
+    }
+    .roman-langs-menu[hidden] { display: none; }
+    #romanLangsList { max-height: 230px; overflow-y: auto; }
+    .roman-group-head { display: flex; flex-direction: column; gap: 1px; padding: 8px 0 3px; border-top: 1px solid rgba(255,255,255,0.08); margin-top: 4px; }
+    .roman-group-head:first-child { border-top: none; margin-top: 0; padding-top: 2px; }
+    .roman-group-title { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-1); }
+    .roman-group-note { font-size: 10.5px; color: var(--text-2); }
+    .roman-langs-actions { display: flex; gap: 12px; padding: 2px 0 6px; }
+    .roman-langs-actions button {
+      background: none; border: none; padding: 0; cursor: pointer; font-family: inherit;
+      color: var(--text-2); font-size: 11.5px; text-decoration: underline;
+    }
+    .roman-langs-actions button:hover { color: var(--text-1); }
+    .roman-lang-item {
+      display: flex; align-items: center; gap: 8px; padding: 4px 0;
+      color: var(--text-1); font-size: 12.5px; cursor: pointer;
+    }
+    .roman-lang-item input { accent-color: #8ab4ff; margin: 0; cursor: pointer; }
+
+    /* Collapsible descriptions (popup-info.js) */
+    .info-btn {
+      flex: none; display: inline-flex; align-items: center; justify-content: center;
+      width: 16px; height: 16px; padding: 0; margin-left: 2px;
+      border-radius: 50%; border: 1px solid rgba(255,255,255,.2); background: transparent;
+      color: #8d8c9b; cursor: pointer; vertical-align: middle;
+      font: italic 700 10px/1 Georgia, 'Times New Roman', serif;
+      transition: color .15s, border-color .15s, background .15s, transform .15s;
+    }
+    .info-btn:hover { color: #fff; border-color: rgba(255,255,255,.45); }
+    .info-btn:active { transform: scale(.92); }
+    .info-btn:focus-visible { outline: 2px solid var(--panel-accent, #9585ff); outline-offset: 2px; }
+    .info-btn[aria-expanded="true"] {
+      color: var(--panel-accent, #9585ff); border-color: currentColor;
+      background: color-mix(in srgb, var(--panel-accent, #9585ff), transparent 86%);
+    }
+    .theme-sub[data-info="1"] { display: none; }
+    .theme-sub[data-info="1"].info-open { display: block; animation: viviInfoIn .18s ease-out; }
+    @keyframes viviInfoIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+    @media (prefers-reduced-motion: reduce) { .theme-sub[data-info="1"].info-open { animation: none; } }
   </style>
 </head>
 <body>
@@ -1158,7 +1211,30 @@
         <span class="slider"></span>
       </label>
     </div>
-    <p class="theme-sub">Pulls lyrics data from lrc.red, BiniLyrics, Better Lyrics (incl. Unison, Portato, Legato), Musixmatch, LRCLIB, Spotify — syllable-synced lyrics shown when available, then word-synced, then line-synced, otherwise plain. Use the +/− next to "Lyrics via …" if a specific song's timing is a little off — it's saved per song and provider.Also can be refetched from other providers</p>
+    <p class="theme-sub" data-info-for="#lyricsToggle">Pulls lyrics data from lrc.red, BiniLyrics, Better Lyrics (incl. Unison, Portato, Legato), Musixmatch, LRCLIB, Spotify — syllable-synced lyrics shown when available, then word-synced, then line-synced, otherwise plain. Use the +/− next to "Lyrics via …" if a specific song's timing is a little off — it's saved per song and provider.Also can be refetched from other providers</p>
+
+    <div class="row" style="margin-top:8px;">
+      <span class="row-label">Romanization</span>
+      <select id="lyricsRomanSelect" style="background:rgba(255,255,255,0.06); color:var(--text-1); border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:5px 8px; font-size:12.5px;">
+        <option value="off" selected>Off</option>
+        <option value="only">Romanized only</option>
+        <option value="both">Original + romanized</option>
+      </select>
+    </div>
+    <p class="theme-sub">Shows lyrics in Latin letters, written the way they sound (not translated), either instead of the original or as a small line under each original line. Korean, Japanese kana, Chinese (pinyin), Hindi, Punjabi and Georgian are converted on-device. Japanese kanji, Bengali, Tamil, Telugu, Gujarati, Kannada, Malayalam, Odia, Sinhala, Arabic/Urdu/Persian, Hebrew, Russian/Cyrillic, Greek and Thai are looked up automatically through Google Translate when ticked below (only the text of those lines is sent). Arabic, Urdu, Persian and Hebrew are written without short vowels, so they come out approximate.</p>
+
+    <div class="row" style="margin-top:8px;">
+      <span class="row-label">Languages to romanize</span>
+      <button type="button" id="romanLangsBtn" class="roman-langs-btn" aria-expanded="false" aria-controls="romanLangsMenu">All languages</button>
+    </div>
+    <div id="romanLangsMenu" class="roman-langs-menu" hidden>
+      <div class="roman-langs-actions">
+        <button type="button" id="romanLangsAll">Select all</button>
+        <button type="button" id="romanLangsNone">Clear</button>
+      </div>
+      <div id="romanLangsList"></div>
+    </div>
+
 
     <div class="row" style="margin-top:8px;">
       <span class="row-label">Lyrics alignment</span>
@@ -1236,7 +1312,7 @@
         <span class="slider"></span>
       </label>
     </div>
-    <p class="theme-sub">Auto-skips talking/intro/outro parts of music videos and keeps lyrics timing in sync with the skip.</p>
+    <p class="theme-sub">Auto-skips talking/intro/outro parts of music videos and keeps lyrics timing in sync with the skip. Segment data from <a href="https://sponsor.ajay.app/" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline;">SponsorBlock</a> (CC BY-NC-SA 4.0).</p>
 
     <div class="providers-toggle" id="providersToggle">
       <span>Lyrics providers</span>
@@ -1350,7 +1426,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
       <span id="cacheIoSuccessText"></span>
     </p>
-    <p class="theme-sub">Cached artwork is just the resolved video/image link for each track — the actual media is served by your browser's normal cache, so replays are instant without VIVIMUSIC storing extra copies on disk. Press <b>Alt+C</b> on the YouTube Music tab any time to see this same list — plus the current track's live cache status — without opening this popup.</p>
+    <p class="theme-sub" data-info-for=".cache-title">Cached artwork is just the resolved video/image link for each track — the actual media is served by your browser's normal cache, so replays are instant without VIVIMUSIC storing extra copies on disk. Press <b>Alt+C</b> on the YouTube Music tab any time to see this same list — plus the current track's live cache status — without opening this popup.</p>
     <div class="cache-search-wrap">
       <input type="text" class="cache-search" id="cacheSearch" placeholder="Search cached artwork…" autocomplete="off">
       <button class="cache-search-clear" id="cacheSearchClear" title="Clear search" aria-label="Clear search">
@@ -1417,7 +1493,7 @@
         </div>
       </div>
     </div>
-    <p class="theme-sub transfer-note">Choose liked songs and playlists in a separate transfer window.</p>
+    <p class="theme-sub transfer-note" data-info-for=".transfer-beta">Choose liked songs and playlists in a separate transfer window.</p>
   </div>
 
   <!-- Last.fm -->
@@ -1513,6 +1589,7 @@
   </div>
 
   <script src="popup-ui.js"></script>
+  <script src="popup-info.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

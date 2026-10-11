@@ -5,6 +5,15 @@
  * (talking/intro/outro/skit parts of a music video that aren't the song
  * itself) using SponsorBlock's privacy-preserving hash-prefix API, and
  * exposes them so content.js can auto-skip through them.
+ *
+ * ATTRIBUTION / LICENSING
+ *   This file is original Vivimusic Web code. It only calls SponsorBlock's
+ *   public HTTP API; it contains no code from the SponsorBlock browser
+ *   extension (GPL-3.0).
+ *   Segment data comes from SponsorBlock (https://sponsor.ajay.app/) by
+ *   Ajay Ramachandran and contributors, licensed CC BY-NC-SA 4.0
+ *   (https://creativecommons.org/licenses/by-nc-sa/4.0/). The data is read
+ *   live and cached locally per user; it is never bundled or redistributed.
  */
 
 (() => {

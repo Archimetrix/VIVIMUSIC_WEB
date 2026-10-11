@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Vivimusic Web",
-  "version": "9.1.0",
+  "version": "9.1.1",
   "description": "Vivimusic Web — Apple Music artwork, Spotify Canvas, synced lyrics, Last.fm scrobbling and Spotify → YouTube Music playlist transfer using local Spotify Web GraphQL and YouTube Music page session.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAodVgf320I+Nl4y2brFxWRyRRBW1XlSpf/Nr0uZvQk3H931IWS/lKNcCzL+x7SD+hEo6L3AbN3yo0jvwp828vPxPb7j0TN9VShKkCx8xub3b6u7umdbjqRw7TKF7L5CMsaEVMjtrCAtROQCjos4DL38So93jwbGhKja2vFPknLLRJQxoQ6y+srZx7HBRswidCcinkNrLrwATnrsnsvHijg6vDsnvQP+iRtPQ18H+QlMHGIzQY6FivqnCijLf2baRi/tWMnulTkWlZXURkKyP1L+wGdU19OZ66e79brteGKjOEaq1Sq6+ftPNLcQHfuJ9/EBqP5ZlQBsSaOlVAsQJIKwIDAQAB",
   "permissions": [
@@ -25,6 +25,7 @@
     "https://*.lrc.red/*",
     "https://api.deezer.com/*",
     "https://apic-desktop.musixmatch.com/*",
+    "https://apic-appmobile.musixmatch.com/*",
     "https://apic.musixmatch.com/*",
     "https://www.musixmatch.com/*",
     "https://api.github.com/*",
@@ -42,6 +43,7 @@
     "https://code.thetadev.de/*",
     "https://song.link/*",
     "https://sponsor.ajay.app/*",
+    "https://translate.googleapis.com/*",
     "https://*.mzstatic.com/*",
     "https://*.apple.com/*",
     "https://*.cdn-apple.com/*",
@@ -73,6 +75,8 @@
       ],
       "js": [
         "src/lyrics.js",
+        "src/vendor/pinyin-pro.min.js",
+        "src/romanize.js",
         "src/lyrics-ui.js",
         "src/sponsorblock.js",
         "src/kawarp.js",

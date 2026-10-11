@@ -711,11 +711,73 @@ function looksLikeTrackData(node) {
   return hasArtists || hasDuration;
 }
 
+// Pull an image URL out of whatever shape Spotify uses for avatars
+// (plain string, {sources:[{url,width}]}, [{url}], {image_url}, …).
+function pickAvatarUrl(node, depth = 0) {
+  if (!node || depth > 6) return '';
+  if (typeof node === 'string') return /^https?:\/\//i.test(node) ? node : '';
+  if (typeof node !== 'object') return '';
+  if (Array.isArray(node)) {
+    let best = '', bestW = -1;
+    for (const x of node) {
+      const u = pickAvatarUrl(x, depth + 1);
+      const w = Number(x?.width || x?.maxWidth || 0);
+      if (u && w >= bestW) { best = u; bestW = w; }
+    }
+    return best;
+  }
+  for (const k of ['url', 'image_url', 'large_image_url', 'sources', 'items', 'images', 'image', 'avatar']) {
+    if (node[k]) { const u = pickAvatarUrl(node[k], depth + 1); if (u) return u; }
+  }
+  return '';
+}
+
+let spotifyProfileImageCache = null; // { id, url }
+async function spotifyFetchProfileImage(userId) {
+  if (!userId) return '';
+  if (spotifyProfileImageCache?.id === userId && spotifyProfileImageCache.url) return spotifyProfileImageCache.url;
+  let url = '';
+  try {
+    const spDc = await getSpDc();
+    const auth = await getSpotifyToken(spDc);
+    const clientToken = await getSpotifyClientToken();
+    const headers = {
+      'Authorization': `Bearer ${auth.token}`,
+      'Client-Token': clientToken,
+      'Accept': 'application/json',
+      'App-Platform': 'WebPlayer',
+      'Origin': 'https://open.spotify.com',
+      'Referer': 'https://open.spotify.com/',
+      'User-Agent': SPOTIFY_UA
+    };
+    const tries = [
+      // Same endpoint the Spotify web player uses for the profile page header.
+      [`https://spclient.wg.spotify.com/user-profile-view/v3/profile/${encodeURIComponent(userId)}?playlist_limit=0&artist_limit=0&episode_limit=0&market=from_token`, j => j?.image_url || j?.large_image_url || pickAvatarUrl(j?.avatar) || pickAvatarUrl(j?.images)],
+      // Public Web API profile (may be rate limited, so only a fallback).
+      [`https://api.spotify.com/v1/users/${encodeURIComponent(userId)}`, j => pickAvatarUrl(j?.images)]
+    ];
+    for (const [endpoint, extract] of tries) {
+      try {
+        const r = await fetch(endpoint, { headers, cache: 'no-store' });
+        if (!r.ok) continue;
+        url = extract(await r.json()) || '';
+        if (url) break;
+      } catch {}
+    }
+  } catch {}
+  if (url) spotifyProfileImageCache = { id: userId, url };
+  return url;
+}
+
 async function spotifyGetUser() {
   const data = await spotifyGql('profileAttributes');
   const p = data?.data?.me?.profile;
   if (!p) throw new Error('Spotify profile data was not returned.');
-  return { id: String(p.uri || '').split(':').pop(), display_name: p.name || '', images: [] };
+  const id = String(p.uri || '').split(':').pop();
+  let image = pickAvatarUrl(p.avatar) || pickAvatarUrl(p.images) || pickAvatarUrl(p.image);
+  if (!image) image = await spotifyFetchProfileImage(id);
+  if (!image) console.debug('[Vivi] Spotify profile has no avatar. profile keys:', Object.keys(p));
+  return { id, display_name: p.name || '', images: image ? [{ url: image }] : [] };
 }
 
 async function spotifyListPlaylists() {

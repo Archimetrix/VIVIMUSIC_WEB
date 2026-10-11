@@ -224,17 +224,17 @@ async function checkForUpdate() {
 // Respects existing choices: a user's own order is kept, with lrc.red just
 // slotted in at the top; priority is only switched on for users who never
 // configured an order.
-const DEFAULT_PRIORITY_ORDER = ['lrcred', 'binilyrics', 'unison'];
+const DEFAULT_PRIORITY_ORDER = ['lrcred', 'binilyrics', 'musixmatch'];
 async function migrateLyricsDefaults() {
   // "Show lyrics for video songs" now defaults to off — applied once.
   const v = await chrome.storage.local.get({ vivi_video_lyrics_default_off: false });
   if (!v.vivi_video_lyrics_default_off) {
     await chrome.storage.local.set({ lyricsShowForVideos: false, vivi_video_lyrics_default_off: true });
   }
-  // "Wait 2s for higher-priority provider" now defaults to off — applied once.
-  const w = await chrome.storage.local.get({ vivi_wait_default_off: false });
-  if (!w.vivi_wait_default_off) {
-    await chrome.storage.local.set({ lyricsPriorityWaitEnabled: false, vivi_wait_default_off: true });
+  // "Wait 2s for best quality" now defaults to ON — applied once.
+  const w = await chrome.storage.local.get({ vivi_wait_default_on_v2: false });
+  if (!w.vivi_wait_default_on_v2) {
+    await chrome.storage.local.set({ lyricsPriorityWaitEnabled: true, vivi_wait_default_on_v2: true });
   }
   // Top-3 priority is syllable/word providers only — strip any line-only
   // provider (Legato/Kugou, Legacy, LRCLIB) a user had
@@ -427,8 +427,41 @@ async function handleLastfmLove(track, loved) {
 }
 
 
+// Romanization of Japanese lines that contain kanji (kana / Korean / Chinese /
+// Hindi / Punjabi are romanized offline inside the page). Returns null on any
+// failure so the UI just keeps the original text.
+async function romanizeJapaneseViaGoogle(text, sl) {
+  sl = /^[A-Za-z-]{2,8}$/.test(String(sl || '')) ? String(sl) : 'ja';
+  const q = String(text || '').slice(0, 500);
+  if (!q) return null;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 7000);
+  try {
+    const url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=' + encodeURIComponent(sl) + '&tl=en&dt=t&dt=rm&q=' + encodeURIComponent(q);
+    const res = await fetch(url, { signal: ctrl.signal, credentials: 'omit' });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const segs = Array.isArray(data && data[0]) ? data[0] : [];
+    const parts = [];
+    for (const s of segs) {
+      if (Array.isArray(s) && s[0] == null && typeof s[3] === 'string' && s[3].trim()) parts.push(s[3].trim());
+    }
+    const out = parts.join(' ').replace(/\s+/g, ' ').trim();
+    return out || null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   switch (msg.type) {
+
+    case 'VIVI_ROMANIZE_JA':
+      romanizeJapaneseViaGoogle(msg.text, msg.sl).then((text) => sendResponse({ ok: !!text, text })).catch(() => sendResponse({ ok: false }));
+      return true;
 
     case 'VIVI_SPOTIFY_STATUS':
       spotifyStatus().then(sendResponse);
@@ -464,6 +497,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       (async () => {
         let tabs = await chrome.tabs.query({ url: 'https://music.youtube.com/*' });
         let tab = tabs.find(t => t.active) || tabs[0];
+        if (!tab?.id && msg.passive) return { ok: false, error: 'Open YouTube Music in a tab first.' };
         if (!tab?.id) {
           tab = await chrome.tabs.create({ url: 'https://music.youtube.com/', active: true });
           await new Promise(resolve => {
@@ -536,16 +570,31 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
  *   track.richsync.get -> track.subtitle.get -> track.lyrics.get
  * ------------------------------------------------------------------------- */
 
-const MXM_BASE = 'https://apic.musixmatch.com/ws/1.1/';
-const MXM_APP_ID = 'mobile-app-v1.0';
+// Musixmatch retired the desktop API host in Sept 2026 and now gates the
+// older hosts. The currently working path (used by Spicetify, ESLyric and
+// others) is the iOS-app host + app id, unsigned, with a user token. The
+// previous signed Android-style flow is kept as a fallback profile.
+const MXM_PROFILES = [
+  { name: 'mobile', base: 'https://apic-appmobile.musixmatch.com/ws/1.1/', appId: 'mac-ios-v2.0', sign: false },
+  { name: 'legacy', base: 'https://apic.musixmatch.com/ws/1.1/', appId: 'mobile-app-v1.0', sign: true },
+];
+const MXM_HEADERS = {
+  Accept: 'application/json, text/plain, */*',
+  'Accept-Language': 'en-US,en;q=0.9',
+  'X-User-Agent': 'Musixmatch/2025120901 CFNetwork/3860.300.31 Darwin/25.2.0',
+  'X-Cookie': 'x-mxm-token-guid=',
+};
+// token.get returns this sentinel (with status 200) when it silently refuses
+// to issue a real token; using it makes every later call fail with 401.
+const MXM_BAD_TOKEN = /^UpgradeOnly/i;
+const mxmTokens = new Map(); // profile.name -> { token, at }
+let mxmPreferredProfile = 0;
 const MXM_SECRET_FALLBACK = 'b3dc8788299f5806a70a6a20a0cb0ffc';
 const MXM_SECRET_TTL_MS = 12 * 60 * 60 * 1000;
 const MXM_TOKEN_TTL_MS = 10 * 60 * 1000;
 
 let mxmSecretCache = null;
 let mxmSecretFetchedAt = 0;
-let mxmTokenCache = null;
-let mxmTokenFetchedAt = 0;
 const mxmGuid = crypto.randomUUID();
 
 function mxmCleanText(text) {
@@ -555,7 +604,11 @@ function mxmCleanText(text) {
     .replace(/\(.*?\)/g, '')
     .replace(/\[.*?\]/g, '')
     .toLowerCase()
-    .replace(/[^a-z0-9 ]/g, '')
+    // Strip Latin accents only; keep letters/digits/combining marks of every
+    // script so Hindi/Bengali/Japanese/Korean/etc. titles don't collapse to ''.
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\p{L}\p{N}\p{M} ]/gu, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -570,7 +623,7 @@ async function mxmFetchText(url, options = {}) {
       credentials: 'omit',
       cache: 'no-store',
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status} from ${new URL(url).hostname}`);
     return await res.text();
   } finally {
     clearTimeout(timer);
@@ -718,7 +771,10 @@ function mxmYearFromTrack(track) {
 // as "Sean Paul feat. Dua Lipa" (or just "Dua Lipa") still scores as a
 // proper artist match instead of a wrong-artist mismatch.
 function mxmExtractFeatured(title) {
-  const re = /[\(\[]?\s*(?:feat\.?|featuring|ft\.?|with)\s+([^)\]]+)[\)\]]?\s*$/i;
+  // A trailing "(feat. X)" / "[ft. X]" / "(with X)" / bare "feat. X". "with" is
+  // only treated as a credit when bracketed, so "Dancing With Myself" keeps
+  // its full title instead of being truncated to "Dancing".
+  const re = /(?:\s*[\(\[]\s*(?:feat|featuring|ft|with)\b\.?|\s+(?:feat|featuring|ft)\b\.?(?=\s))\s*([^)\]]+)[\)\]]?\s*$/i;
   const match = String(title || '').match(re);
   if (!match) return { cleanTitle: title, featured: [] };
   const cleanTitle = title.slice(0, match.index).trim();
@@ -729,107 +785,207 @@ function mxmExtractFeatured(title) {
   return { cleanTitle: cleanTitle || title, featured };
 }
 
-function pickMxmTrack(list, requestedTitle, requestedArtist, requestedAlbum, duration, requestedYear) {
-  const normalizedTitle = mxmCleanText(requestedTitle);
-  const normalizedArtist = mxmNormalizeArtist(requestedArtist);
+/* ---- Matching hardening ------------------------------------------------
+ * Wrong lyrics come from picking a *different recording* that merely looks
+ * similar: live / remix / sped-up cuts, same-word titles ("Love" vs "Love
+ * Story"), same-first-name artists ("Drake" vs "Drake Bell"), or another
+ * edit with different timing. The helpers below make identity strict while
+ * still tolerating harmless noise (remaster tags, feat. credits, accents).
+ * ----------------------------------------------------------------------- */
+
+// Markers meaning "a different recording / arrangement" (lowercased text).
+const MXM_VERSION_RULES = [
+  ['live',         /\b(live|unplugged|in concert|concert|session)\b/],
+  ['remix',        /\b(remix|rmx|vip|bootleg|mashup|rework|refix|flip)\b/],
+  ['acoustic',     /\b(acoustic|stripped)\b/],
+  ['instrumental', /\b(instrumental|karaoke|backing track|minus one)\b/],
+  ['cover',        /\b(cover|tribute|originally performed|in the style of)\b/],
+  ['speed',        /\b(sped up|speed up|slowed|reverb|nightcore|8d|bass boosted|lofi|lo-fi|chopped)\b/],
+  ['demo',         /\b(demo|rough mix|alternate|alt\.? version|early version|outtake)\b/],
+  ['arrangement',  /\b(piano version|orchestral|orchestra|symphonic|a cappella|acapella|string version)\b/],
+  ['edit',         /\b(radio edit|extended|club mix|dub mix|dance mix|edit)\b/],
+  ['rerecord',     /\b(taylor'?s version|re-?recorded|rerecorded)\b/],
+];
+// Flags where a mismatch is only penalised (lyrics are normally identical;
+// the duration / sync-length checks still guard the timing).
+const MXM_SOFT_FLAGS = new Set(['edit', 'rerecord']);
+// Parenthetical / dash segments that carry no identity ("Remastered 2011",
+// "feat. X", "Deluxe Edition", "Official Audio" ...). Anything else, e.g.
+// "(Part 2)" or "(Spanish Version)", is kept as part of the title.
+const MXM_NOISE = /\b(remaster(?:ed)?|deluxe|edition|mono|stereo|bonus track|explicit|clean|official|audio|video|lyric video|lyrics|soundtrack|motion picture|single version|album version|original version|(?:19|20)\d{2})\b|\bfrom\s+["“”'‘’]/;
+const MXM_NOISE_START = /^(?:feat\.?|ft\.?|featuring|with|prod\.?)\b/;
+
+function mxmParseTitle(raw) {
+  let rest = String(raw || '').replace(/[‘’]/g, "'");
+  const flags = new Set();
+  const consume = (seg) => {
+    const low = seg.toLowerCase().trim();
+    let hit = false;
+    for (const [flag, re] of MXM_VERSION_RULES) {
+      if (re.test(low)) { flags.add(flag); hit = true; }
+    }
+    return hit || MXM_NOISE.test(low) || MXM_NOISE_START.test(low);
+  };
+  rest = rest.replace(/[\(\[]([^\)\]]*)[\)\]]/g, (_m, inner) => (consume(inner) ? ' ' : ` ${inner} `));
+  const parts = rest.split(/\s[-–—]\s/);
+  if (parts.length > 1) {
+    const kept = [parts[0]];
+    for (const part of parts.slice(1)) if (!consume(part)) kept.push(part);
+    rest = kept.join(' ');
+  }
+  const plain = rest.replace(/\s+/g, ' ').trim();
+  let base = mxmCleanText(plain);
+  if (!base) base = plain.toLowerCase().replace(/\s+/g, ' ').trim(); // symbol-only titles
+  const digits = (base.match(/\d+/g) || []).sort().join(',');
+  return { plain, base, flags, digits };
+}
+
+function mxmLevRatio(a, b) {
+  if (a === b) return 1;
+  const m = a.length, n = b.length;
+  if (!m || !n) return 0;
+  let prev = Array.from({ length: n + 1 }, (_, j) => j);
+  for (let i = 1; i <= m; i++) {
+    const cur = [i];
+    for (let j = 1; j <= n; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    prev = cur;
+  }
+  return 1 - prev[n] / Math.max(m, n);
+}
+
+function mxmTitleMatch(req, cand) {
+  if (!req.base || !cand.base) return { ok: false };
+  // "Part 1" vs "Part 2", "7 Rings" vs "9 Rings" must never match.
+  if (req.digits !== cand.digits) return { ok: false };
+  if (req.base === cand.base) return { ok: true, exact: true, sim: 1 };
+  const sim = mxmLevRatio(req.base, cand.base);
+  const longEnough = Math.min(req.base.length, cand.base.length) >= 8;
+  return { ok: longEnough && sim >= 0.88, exact: false, sim };
+}
+
+// "A, B & C feat. D" -> ['a','b','c','d'] (each normalised).
+function mxmArtistNames(text) {
+  return String(text || '')
+    .replace(/[‘’]/g, "'")
+    .split(/\s*(?:,|&|\+|;|×|\bfeat\.?|\bft\.?|\bfeaturing\b|\band\b|\bwith\b|\svs\.?\s|\sx\s)\s*/i)
+    .map((n) => mxmCleanText(n))
+    .filter(Boolean)
+    .filter((n, i, a) => a.indexOf(n) === i);
+}
+
+function mxmNameSim(a, b) {
+  if (a === b) return 1;
+  const ac = a.replace(/ /g, ''), bc = b.replace(/ /g, '');
+  if (ac === bc) return 1;
+  if (Math.min(ac.length, bc.length) <= 4) return 0; // short names must match exactly
+  return mxmLevRatio(ac, bc);
+}
+const MXM_NAME_OK = 0.86;
+
+const MXM_MAX_CANDIDATES = 3;
+const MXM_CANDIDATE_SCORE_WINDOW = 80;
+
+function pickMxmTracks(list, requestedTitle, requestedArtist, requestedAlbum, duration, requestedYear) {
+  const req = mxmParseTitle(requestedTitle);
+  const reqNames = mxmArtistNames(requestedArtist);
   const normalizedAlbum = mxmNormalizeAlbum(requestedAlbum);
   const yearWanted = Number(requestedYear) || null;
+  const scored = [];
 
-  const candidates = list
-    .map(x => x?.track)
-    .filter(Boolean)
-    .map(track => {
-      const title = mxmCleanText(track.track_name);
-      const artist = mxmNormalizeArtist(track.artist_name);
-      const album = mxmNormalizeAlbum(
-        track.album_name || track.album || track.album_name_with_artist || ''
-      );
-      const trackDur = Number(track.track_length) || 0;
-      const durDelta = duration > 0 && trackDur > 0 ? Math.abs(trackDur - duration) : null;
-      const trackYear = mxmYearFromTrack(track);
-      const yearDelta = yearWanted && trackYear ? Math.abs(trackYear - yearWanted) : null;
+  for (const entry of Array.isArray(list) ? list : []) {
+    const track = entry?.track;
+    if (!track) continue;
+    if (Number(track.instrumental) === 1) continue;
+    // has_lyrics is numeric (0/1) in the API, not a boolean.
+    if (track.has_lyrics != null && Number(track.has_lyrics) === 0) continue;
 
-      const titleExact = title === normalizedTitle;
-      const titleRelated = mxmWordsRelated(title, normalizedTitle);
-      const artistExact = normalizedArtist && artist === normalizedArtist;
-      const artistRelated = normalizedArtist && mxmWordsRelated(artist, normalizedArtist);
-      const albumExact = normalizedAlbum && album === normalizedAlbum;
-      const albumRelated = normalizedAlbum && mxmWordsRelated(album, normalizedAlbum);
+    // ---- title identity -------------------------------------------------
+    const cand = mxmParseTitle(track.track_name);
+    const tm = mxmTitleMatch(req, cand);
+    if (!tm.ok) continue;
 
-      // Hard reject obvious wrong-title results. A substring match is allowed
-      // because Musixmatch often appends edit/version text to the title.
-      if (!titleRelated) return null;
+    // ---- version flags (live / remix / sped up / ...) -------------------
+    let penalty = 0;
+    let rejected = false;
+    for (const f of cand.flags) {
+      if (req.flags.has(f)) continue;
+      if (MXM_SOFT_FLAGS.has(f)) penalty += 60; else { rejected = true; break; }
+    }
+    if (rejected) continue;
+    for (const f of req.flags) if (!cand.flags.has(f)) penalty += 40;
 
-      // Artist is much more important than duration. The old selector could
-      // choose a different artist/version when the title and duration were close.
-      if (normalizedArtist && !artistExact && !artistRelated) return null;
+    // ---- album / duration (computed first: the artist-alias rule uses them)
+    const album = mxmNormalizeAlbum(track.album_name || track.album || track.album_name_with_artist || '');
+    const albumExact = !!normalizedAlbum && album === normalizedAlbum;
+    const albumRelated = !!normalizedAlbum && mxmWordsRelated(album, normalizedAlbum);
+    const trackDur = Number(track.track_length) || 0;
+    const durDelta = duration > 0 && trackDur > 0 ? Math.abs(trackDur - duration) : null;
+    if (durDelta != null) {
+      if (durDelta > 45) continue;                    // a different edit, always
+      if (durDelta > 15 && !albumExact) continue;     // different edit unless same release
+    }
 
-      // Album and year are NOT used as hard filters: the same recording is
-      // routinely catalogued under different album names/years on different
-      // platforms — a song's YT Music album can be a later compilation or
-      // reissue ("Mad Love The Prequel", 2018) while Musixmatch's canonical
-      // entry for the identical track is filed under the original single's
-      // release ("Weekend Party Hits", 2016). Hard-rejecting on a mismatch
-      // here would throw out the correct, verified entry. They're used only
-      // as scoring tie-breakers below, alongside duration.
+    // ---- artist identity ------------------------------------------------
+    const candNames = mxmArtistNames(track.artist_name);
+    let matched = 0;
+    for (const r of reqNames) if (candNames.some((c) => mxmNameSim(r, c) >= MXM_NAME_OK)) matched++;
+    const primaryMatched = reqNames.length
+      ? candNames.some((c) => mxmNameSim(reqNames[0], c) >= MXM_NAME_OK)
+      : true;
+    if (reqNames.length && matched === 0) {
+      // Transliterated / aliased artist names (e.g. Latin vs native script):
+      // only trust it when title is exact, the album matches AND the length
+      // is within 2s - three independent confirmations.
+      const aliasOk = tm.exact && albumExact && durDelta != null && durDelta <= 2;
+      if (!aliasOk) continue;
+      penalty += 30;
+    }
+    const coverage = reqNames.length
+      ? matched / Math.max(reqNames.length, candNames.length || 1)
+      : 1;
 
-      let score = 0;
-      score += titleExact ? 0 : 100;
-      score += artistExact ? 0 : 30;
-      if (normalizedAlbum) score += albumExact ? 0 : (albumRelated ? 15 : 25);
-      if (yearWanted) {
-        if (yearDelta == null) score += 10; // unknown year — mild penalty, not disqualifying
-        else score += Math.min(yearDelta, 10) * 4; // each year of gap costs more
-      }
+    // ---- score (lower is better) ---------------------------------------
+    let score = penalty;
+    score += tm.exact ? 0 : Math.round((1 - tm.sim) * 100);
+    if (reqNames.length) {
+      score += primaryMatched ? 0 : 15;
+      score += Math.round((1 - coverage) * 30);
+    }
+    // Album and year are tie-breakers only: the same recording is often
+    // catalogued under a different album/year on different platforms.
+    if (normalizedAlbum) score += albumExact ? 0 : (albumRelated ? 15 : 25);
+    if (yearWanted) {
+      const ty = mxmYearFromTrack(track);
+      score += ty ? Math.min(Math.abs(ty - yearWanted), 10) * 4 : 10;
+    }
+    if (durDelta != null) {
+      if (durDelta <= 2) score += 0;
+      else if (durDelta <= 4) score += 5;
+      else if (durDelta <= 8) score += 15;
+      else if (durDelta <= 15) score += 35;
+      else score += 60;
+    } else {
+      score += 25;
+    }
+    // Prefer entries that actually carry synced data, then popular ones -
+    // never enough to overrule identity.
+    if (Number(track.has_richsync) === 1) score -= 4;
+    if (Number(track.has_subtitles) === 1) score -= 2;
+    if (Number(track.track_rating) > 0) score -= Math.min(Number(track.track_rating), 20) / 20;
 
-      // Duration is only a secondary discriminator inside an already-matching
-      // title/artist/release candidate. Keep a generous tolerance for uploads
-      // whose reported duration differs slightly from the source recording.
-      if (durDelta != null) {
-        if (durDelta <= 2) score += 0;
-        else if (durDelta <= 5) score += 5;
-        else if (durDelta <= 10) score += 15;
-        else if (durDelta <= 20) score += 35;
-        else score += 70;
-      } else {
-        score += 25;
-      }
-
-      // Prefer an actual track with lyrics and a normal track rating when the
-      // API supplies those fields, but never let them overrule identity.
-      if (track.has_lyrics === false) score += 1000;
-      if (Number(track.track_rating) > 0) score -= Math.min(Number(track.track_rating), 20) / 20;
-
-      return { track, score, title, artist, album, durDelta, albumExact, albumRelated };
-    })
-    .filter(Boolean)
-    .sort((a, b) => a.score - b.score);
-
-  if (!candidates.length) return null;
-
-  const best = candidates[0];
-
-  // Final guard: if the best candidate is suspiciously far from the requested
-  // duration and we cannot confirm the album, don't silently serve another edit.
-  // Exact title+artist can still pass when duration metadata is unavailable.
-  if (duration > 0 && best.durDelta != null && best.durDelta > 45 && !normalizedAlbum) {
-    return null;
+    scored.push({ track, score });
   }
 
-  // A different edit of the same title+artist (radio edit, extended mix,
-  // remaster, live cut) can still pass the checks above when the album
-  // isn't confirmed, and Musixmatch's own duration metadata for user
-  // uploads is often a little off — but a candidate that's more than 20s
-  // away from the real track, with no album match to back it up, is much
-  // more likely a wrong version than a metadata rounding error. Rejecting
-  // it here means we fall through to no-match rather than serving richsync
-  // timing for the wrong recording, which looks synced at first and then
-  // drifts as the two versions' structures diverge.
-  if (duration > 0 && best.durDelta != null && best.durDelta > 20 && !best.albumExact && !best.albumRelated) {
-    return null;
-  }
+  if (!scored.length) return [];
+  scored.sort((a, b) => a.score - b.score);
+  const cutoff = scored[0].score + MXM_CANDIDATE_SCORE_WINDOW;
+  return scored.filter((c) => c.score <= cutoff).slice(0, MXM_MAX_CANDIDATES).map((c) => c.track);
+}
 
-  return best.track;
+function pickMxmTrack(list, requestedTitle, requestedArtist, requestedAlbum, duration, requestedYear) {
+  return pickMxmTracks(list, requestedTitle, requestedArtist, requestedAlbum, duration, requestedYear)[0] || null;
 }
 function parseMxmRichsync(body) {
   let entries;
@@ -878,161 +1034,188 @@ function parseMxmSubtitle(body) {
 
 function parseMxmPlain(body) {
   if (!body || !String(body).trim()) return null;
-  const lines = String(body).split(/\r?\n/).filter(Boolean).map(text => ({ text: text.trim() }));
+  const lines = String(body)
+    .split(/\r?\n/)
+    .map((t) => t.trim())
+    // Musixmatch appends a licence footer + tracking id to plain lyrics.
+    .filter((t) => t && !/^\*{3,}.*\*{3,}$/.test(t) && !/^\(\d{6,}\)$/.test(t))
+    .map((text) => ({ text }));
   return lines.length ? { mode: 'plain', lines } : null;
 }
 
-async function mxmSignedGet(path, params, secret) {
-  const url = new URL(path, MXM_BASE);
-  for (const [key, value] of Object.entries(params)) {
+async function mxmApiGet(profile, path, params) {
+  const url = new URL(path, profile.base);
+  url.searchParams.set('app_id', profile.appId);
+  url.searchParams.set('format', 'json');
+  for (const [key, value] of Object.entries(params || {})) {
     if (value !== undefined && value !== null && value !== '') url.searchParams.set(key, String(value));
   }
-  const signed = await signMxmUrl(url.toString(), secret);
-  return mxmFetchJson(signed, { headers: { Accept: 'application/json, text/plain, */*' } });
+  let finalUrl = url.toString();
+  if (profile.sign) finalUrl = await signMxmUrl(finalUrl, await getMxmSecret(false));
+  return mxmFetchJson(finalUrl, { headers: MXM_HEADERS });
 }
 
-async function getMxmToken(forceRefresh = false) {
-  if (!forceRefresh && mxmTokenCache && Date.now() - mxmTokenFetchedAt < MXM_TOKEN_TTL_MS) {
-    return mxmTokenCache;
-  }
-  const secret = await getMxmSecret(forceRefresh);
-  const response = await mxmSignedGet('token.get', {
-    app_id: MXM_APP_ID,
-    guid: mxmGuid,
-    format: 'json',
-  }, secret);
-  if (mxmStatus(response) !== 200) throw new Error(`Musixmatch token status ${mxmStatus(response)}`);
+async function getMxmToken(profile, forceRefresh = false) {
+  const cached = mxmTokens.get(profile.name);
+  if (!forceRefresh && cached && Date.now() - cached.at < MXM_TOKEN_TTL_MS) return cached.token;
+
+  const params = profile.sign ? { guid: mxmGuid } : {};
+  const response = await mxmApiGet(profile, 'token.get', params);
+  if (mxmStatus(response) !== 200) throw new Error(`Musixmatch token status ${mxmStatus(response)} (${profile.name})`);
   const token = response?.message?.body?.user_token;
-  if (!token) throw new Error('Musixmatch returned no user_token');
-  mxmTokenCache = token;
-  mxmTokenFetchedAt = Date.now();
+  if (!token || MXM_BAD_TOKEN.test(token)) throw new Error(`Musixmatch refused to issue a token (${profile.name})`);
+  mxmTokens.set(profile.name, { token, at: Date.now() });
   return token;
 }
 
-async function getMusixmatchLyrics(track, allowRetry = true) {
+function mxmIsAuthStatus(response) {
+  const st = mxmStatus(response);
+  return st === 401 || st === 402;
+}
+
+// Fetches synced/plain lyrics for ONE candidate track and validates that the
+// sync belongs to the same recording (via the sync's own reported length and
+// its timeline). Returns parsed lyrics, or null so the caller can try the
+// next candidate instead of serving a mismatched version.
+async function mxmLyricsForCandidate(call, token, cand, track) {
+  const trackId = cand.track_id;
+  const commonTrackId = cand.commontrack_id || null;
+  const baseParams = { track_id: trackId, usertoken: token };
+  const durS = Number(track.duration) || 0;
+  const durMs = durS * 1000;
+
+  // Reported length of the sync (seconds) vs the real track length.
+  const lengthFits = (len) => {
+    const l = Number(len) || 0;
+    if (!durS || !l) return true;
+    return Math.abs(l - durS) <= Math.max(15, durS * 0.1);
+  };
+  // Timeline vs track length: last lyric far past the end => other edit;
+  // last lyric implausibly early => truncated / other song.
+  const timelineFits = (parsed) => {
+    if (!durMs || !parsed?.lines?.length) return true;
+    const last = parsed.lines[parsed.lines.length - 1];
+    const lastMs = Number((parsed.mode === 'word' ? (last.end ?? last.start) : last.start)) || 0;
+    if (lastMs > durMs + Math.max(20000, durMs * 0.25)) return false;
+    if (durS > 90 && lastMs < durMs * 0.3) return false;
+    return true;
+  };
+
+  const rich = await call('track.richsync.get', baseParams);
+  if (mxmIsAuthStatus(rich)) throw new Error(`AUTH:${mxmStatus(rich)}`);
+  const richObj = rich?.message?.body?.richsync;
+  if (mxmStatus(rich) === 200 && richObj?.richsync_body && lengthFits(richObj.richsync_length)) {
+    const parsed = parseMxmRichsync(richObj.richsync_body);
+    if (parsed && timelineFits(parsed)) return parsed;
+  }
+
+  const subtitleParams = { ...baseParams };
+  if (commonTrackId) subtitleParams.commontrack_id = commonTrackId;
+  const subtitle = await call('track.subtitle.get', subtitleParams);
+  if (mxmIsAuthStatus(subtitle)) throw new Error(`AUTH:${mxmStatus(subtitle)}`);
+  const subObj = subtitle?.message?.body?.subtitle;
+  if (mxmStatus(subtitle) === 200 && subObj?.subtitle_body && lengthFits(subObj.subtitle_length)) {
+    const parsed = parseMxmSubtitle(subObj.subtitle_body);
+    if (parsed && timelineFits(parsed)) return parsed;
+  }
+
+  const plain = await call('track.lyrics.get', baseParams);
+  if (mxmIsAuthStatus(plain)) throw new Error(`AUTH:${mxmStatus(plain)}`);
+  const lyrics = plain?.message?.body?.lyrics;
+  if (mxmStatus(plain) === 200 && lyrics?.lyrics_body && !lyrics.restricted) {
+    const parsed = parseMxmPlain(lyrics.lyrics_body);
+    if (parsed) return parsed;
+  }
+  return null;
+}
+
+async function mxmLyricsWithProfile(profile, track, allowRetry = true) {
   try {
-    const secret = await getMxmSecret(false);
-    const token = await getMxmToken(false);
+    const token = await getMxmToken(profile, false);
+    const call = (path, params) => mxmApiGet(profile, path, params);
 
     const { cleanTitle, featured } = mxmExtractFeatured(track.song);
-    // Combine the byline artist with any title-only featured credit(s) so
-    // neither the search query nor pickMxmTrack's artist check is blind to
-    // a co-artist YT Music only surfaces via "(feat. X)" in the title.
+    // Fold title-only featured credits into the artist so neither the query
+    // nor the artist check is blind to a co-artist.
     const combinedArtist = featured.length
       ? `${track.artist}, ${featured.join(', ')}`
       : track.artist;
+    const primaryArtist = String(track.artist || '')
+      .split(/\s*(?:,|&|\+|;|×|\bfeat\.?|\bft\.?|\bfeaturing\b)\s*/i)[0].trim();
+    const plainTitle = mxmParseTitle(cleanTitle).plain;
 
-    const search = await mxmSignedGet('track.search', {
-      app_id: MXM_APP_ID,
-      format: 'json',
+    const baseSearch = {
       q_track: cleanTitle,
       q_artist: combinedArtist,
-      q_album: track.album || undefined,
       f_has_lyrics: 'true',
       page_size: 10,
       s_track_rating: 'desc',
-      usertoken: token,
-    }, secret);
-
-    if (mxmStatus(search) === 401 || mxmStatus(search) === 402) throw new Error(`AUTH:${mxmStatus(search)}`);
-    if (mxmStatus(search) !== 200) throw new Error(`Musixmatch search status ${mxmStatus(search)}`);
-
-    const list = search?.message?.body?.track_list;
-    let best = pickMxmTrack(
-      Array.isArray(list) ? list : [],
-      cleanTitle,
-      combinedArtist,
-      track.album || null,
-      Number(track.duration) || 0,
-      Number(track.year) || null
-    );
-
-    // If sending q_album narrowed the results down to nothing usable (a
-    // stricter server-side filter can occasionally exclude the right track
-    // when Musixmatch's own album name for it doesn't line up with YT
-    // Music's), retry once without it rather than giving up — better to
-    // fall back to the artist+title-only search than serve no lyrics.
-    if (!best?.track_id && track.album) {
-      const retrySearch = await mxmSignedGet('track.search', {
-        app_id: MXM_APP_ID,
-        format: 'json',
-        q_track: cleanTitle,
-        q_artist: combinedArtist,
-        f_has_lyrics: 'true',
-        page_size: 10,
-        s_track_rating: 'desc',
-        usertoken: token,
-      }, secret);
-      if (mxmStatus(retrySearch) === 200) {
-        const retryList = retrySearch?.message?.body?.track_list;
-        best = pickMxmTrack(
-          Array.isArray(retryList) ? retryList : [],
-          cleanTitle,
-          combinedArtist,
-          track.album || null,
-          Number(track.duration) || 0,
-          Number(track.year) || null
-        );
-      }
-    }
-    if (!best?.track_id) throw new Error('Musixmatch track not found');
-
-    const trackId = best.track_id;
-    const commonTrackId = best.commontrack_id || null;
-    const baseParams = { app_id: MXM_APP_ID, format: 'json', track_id: trackId, usertoken: token };
-
-    const trackDurationMs = (Number(track.duration) || 0) * 1000;
-    // Same rationale as the version-mismatch guard in pickMxmTrack: if the
-    // richsync timeline's last word lands far past (or well short of) the
-    // actual audio length, this richsync almost certainly belongs to a
-    // different edit of the recording. Prefer falling through to the
-    // line-level subtitle (still correctly synced, just not word-level)
-    // over serving word timing that will visibly drift.
-    const richsyncMatchesDuration = (parsed) => {
-      if (!trackDurationMs || !parsed?.lines?.length) return true;
-      const last = parsed.lines[parsed.lines.length - 1];
-      const lastMs = Number(last.end ?? last.start) || 0;
-      const tolerance = Math.max(20000, trackDurationMs * 0.25);
-      return lastMs <= trackDurationMs + tolerance;
     };
+    // Widening ladder - stops at the first query that yields a candidate
+    // that passes the strict identity checks.
+    const attempts = [{ ...baseSearch, q_album: track.album || undefined }];
+    if (track.album) attempts.push({ ...baseSearch });
+    if (plainTitle && plainTitle !== cleanTitle) attempts.push({ ...baseSearch, q_track: plainTitle });
+    if (primaryArtist && primaryArtist !== combinedArtist) attempts.push({ ...baseSearch, q_artist: primaryArtist });
 
-    const rich = await mxmSignedGet('track.richsync.get', baseParams, secret);
-    if (mxmStatus(rich) === 401 || mxmStatus(rich) === 402) throw new Error(`AUTH:${mxmStatus(rich)}`);
-    const richBody = rich?.message?.body?.richsync?.richsync_body;
-    if (mxmStatus(rich) === 200 && richBody) {
-      const parsed = parseMxmRichsync(richBody);
-      if (parsed && richsyncMatchesDuration(parsed)) return parsed;
+    let candidates = [];
+    for (let i = 0; i < attempts.length && !candidates.length; i++) {
+      const resp = await call('track.search', { ...attempts[i], usertoken: token });
+      if (mxmIsAuthStatus(resp)) throw new Error(`AUTH:${mxmStatus(resp)}`);
+      if (mxmStatus(resp) !== 200) {
+        if (i === 0) throw new Error(`Musixmatch search status ${mxmStatus(resp)} (${profile.name})`);
+        continue;
+      }
+      candidates = pickMxmTracks(
+        resp?.message?.body?.track_list,
+        cleanTitle,
+        combinedArtist,
+        track.album || null,
+        Number(track.duration) || 0,
+        Number(track.year) || null
+      );
+    }
+    if (!candidates.length) {
+      const nf = new Error('Musixmatch track not found');
+      nf.mxmNotFound = true;
+      throw nf;
     }
 
-    const subtitleParams = { ...baseParams };
-    if (commonTrackId) subtitleParams.commontrack_id = commonTrackId;
-    const subtitle = await mxmSignedGet('track.subtitle.get', subtitleParams, secret);
-    if (mxmStatus(subtitle) === 401 || mxmStatus(subtitle) === 402) throw new Error(`AUTH:${mxmStatus(subtitle)}`);
-    const subtitleBody = subtitle?.message?.body?.subtitle?.subtitle_body;
-    if (mxmStatus(subtitle) === 200 && subtitleBody) {
-      const parsed = parseMxmSubtitle(subtitleBody);
+    for (const cand of candidates) {
+      const parsed = await mxmLyricsForCandidate(call, token, cand, track);
       if (parsed) return parsed;
     }
-
-    const plain = await mxmSignedGet('track.lyrics.get', baseParams, secret);
-    if (mxmStatus(plain) === 401 || mxmStatus(plain) === 402) throw new Error(`AUTH:${mxmStatus(plain)}`);
-    const lyrics = plain?.message?.body?.lyrics;
-    if (mxmStatus(plain) === 200 && lyrics?.lyrics_body && !lyrics.restricted) {
-      const parsed = parseMxmPlain(lyrics.lyrics_body);
-      if (parsed) return parsed;
-    }
-
     return null;
   } catch (e) {
     if (allowRetry && String(e?.message || '').startsWith('AUTH:')) {
-      mxmTokenCache = null;
-      mxmTokenFetchedAt = 0;
-      mxmSecretCache = null;
-      mxmSecretFetchedAt = 0;
-      return getMusixmatchLyrics(track, false);
+      mxmTokens.delete(profile.name);
+      if (profile.sign) { mxmSecretCache = null; mxmSecretFetchedAt = 0; }
+      return mxmLyricsWithProfile(profile, track, false);
     }
     throw e;
   }
+}
+
+// Tries the preferred (last known-good) profile first, then the others, so a
+// host/app-id the service has blocked degrades to the next one instead of
+// silently returning no lyrics. Failures are logged to the service-worker
+// console ("[Vivi] Musixmatch ...") to make future breakage diagnosable.
+async function getMusixmatchLyrics(track) {
+  const order = [mxmPreferredProfile, ...MXM_PROFILES.map((_, i) => i).filter(i => i !== mxmPreferredProfile)];
+  let lastErr = null;
+  for (const idx of order) {
+    const profile = MXM_PROFILES[idx];
+    try {
+      const lyrics = await mxmLyricsWithProfile(profile, track, true);
+      mxmPreferredProfile = idx;
+      return lyrics;
+    } catch (e) {
+      if (e?.mxmNotFound) { mxmPreferredProfile = idx; throw e; }
+      console.warn(`[Vivi] Musixmatch (${profile.name}) failed:`, e?.message || e);
+      lastErr = e;
+    }
+  }
+  throw lastErr || new Error('Musixmatch unavailable');
 }
 
 // Add the Musixmatch bridge to the existing listener above without changing
