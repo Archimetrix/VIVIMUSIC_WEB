@@ -151,7 +151,7 @@
     kawarpPauseWhenInactive: true,
     kawarpOpacity: 1.0,
     kawarpWarpIntensity: 1.0,
-    kawarpBlurPasses: 5,
+    kawarpBlurPasses: 6,
     kawarpSaturation: 2.6,
     kawarpBrightness: 0.5,
     kawarpDithering: 0.034,
@@ -160,7 +160,7 @@
   };
 
   chrome.storage.local.get(
-    { enabled: true, themeEnabled: true, imageOnlyMode: false, kawarpEnabled: true, eqEnabled: false, lyricsEnabled: true, autoSwitchLyrics: true, sponsorBlockEnabled: true, lyricsShowForVideos: false, dancerOnNotFound: true, lyricsAlign: 'center', lyricsAnimationStyle: 'apple', lyricsFont: 'default', lyricsRoman: 'off', lyricsRomanJa: true, lyricsRomanLangs: null, lyricsProviders: DEFAULT_PROVIDERS, ...KAWARP_DEFAULTS },
+    { enabled: true, themeEnabled: true, imageOnlyMode: false, kawarpEnabled: false, eqEnabled: false, lyricsEnabled: true, autoSwitchLyrics: true, sponsorBlockEnabled: true, lyricsShowForVideos: false, dancerOnNotFound: true, lyricsAlign: 'center', lyricsAnimationStyle: 'apple', lyricsFont: 'default', lyricsRoman: 'off', lyricsRomanJa: true, lyricsRomanLangs: null, lyricsProviders: DEFAULT_PROVIDERS, ...KAWARP_DEFAULTS },
     ({ enabled, themeEnabled, imageOnlyMode, kawarpEnabled, eqEnabled, lyricsEnabled, autoSwitchLyrics, sponsorBlockEnabled, lyricsShowForVideos, dancerOnNotFound, lyricsAlign, lyricsAnimationStyle, lyricsFont, lyricsRoman, lyricsRomanJa, lyricsRomanLangs, lyricsProviders,
        kawarpPauseWhenInactive, kawarpOpacity, kawarpWarpIntensity, kawarpBlurPasses, kawarpSaturation, kawarpBrightness, kawarpDithering, kawarpAnimationSpeed, kawarpTransitionDuration }) => {
       enableToggle.checked = enabled;
@@ -293,6 +293,28 @@
     });
   }
 
+  // ── Optimized & resource saving mode ──
+  // Off by default. While on, the content scripts ignore the saved state of
+  // Kawarp, Apple Music artwork fetching/caching, Last.fm, SponsorBlock, the
+  // no-lyrics dancer and the equalizer. The saved choices themselves are never
+  // touched, so turning the mode off brings everything back as it was.
+  const rsPill = document.getElementById('resourceSaverPill');
+  function paintResourceSaver(on) {
+    document.body.classList.toggle('rs-on', on);
+    if (rsPill) rsPill.setAttribute('aria-checked', on ? 'true' : 'false');
+  }
+  chrome.storage.local.get({ resourceSaverEnabled: false }, ({ resourceSaverEnabled }) => {
+    paintResourceSaver(resourceSaverEnabled === true);
+  });
+  if (rsPill) {
+    rsPill.addEventListener('click', () => {
+      const resourceSaverEnabled = rsPill.getAttribute('aria-checked') !== 'true';
+      paintResourceSaver(resourceSaverEnabled);
+      chrome.storage.local.set({ resourceSaverEnabled });
+      relay({ resourceSaverEnabled });
+    });
+  }
+
   enableToggle.addEventListener('change', () => {
     const enabled = enableToggle.checked;
     chrome.storage.local.set({ enabled });
@@ -305,10 +327,54 @@
     relay({ imageOnlyMode });
   });
 
+  // Kawarp is off by default. Turning it on first shows a short notice about
+  // graphics acceleration; the setting only changes once the person confirms.
+  const gpuOverlay = document.getElementById('gpuOverlay');
+  const gpuOk = document.getElementById('gpuOk');
+  const gpuCancel = document.getElementById('gpuCancel');
+
+  function setupGpuNotice() {
+    const ua = navigator.userAgent || '';
+    const isFirefox = /Firefox\//.test(ua);
+    document.getElementById('gpuFirefox').hidden = !isFirefox;
+    document.getElementById('gpuChromium').hidden = isFirefox;
+    if (isFirefox) return;
+    let name = 'Chrome', path = 'Settings \u2192 System';
+    if (/Edg\//.test(ua)) { name = 'Edge'; path = 'Settings \u2192 System and performance'; }
+    else if (/OPR\//.test(ua)) { name = 'Opera'; path = 'Settings \u2192 Advanced \u2192 System'; }
+    else if (navigator.brave) { name = 'Brave'; path = 'Settings \u2192 System'; }
+    document.getElementById('gpuChromiumTitle').textContent = 'Check this in ' + name;
+    document.getElementById('gpuChromiumPath').textContent = path;
+  }
+  setupGpuNotice();
+
+  function openGpuNotice() {
+    gpuOverlay.classList.add('open');
+    gpuOk.focus();
+  }
+  function closeGpuNotice() {
+    gpuOverlay.classList.remove('open');
+    kawarpToggle.focus();
+  }
+  gpuOk.addEventListener('click', () => {
+    closeGpuNotice();
+    kawarpToggle.checked = true;
+    chrome.storage.local.set({ kawarpEnabled: true });
+    relay({ kawarpEnabled: true });
+  });
+  gpuCancel.addEventListener('click', closeGpuNotice);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && gpuOverlay.classList.contains('open')) closeGpuNotice();
+  });
+
   kawarpToggle.addEventListener('change', () => {
-    const kawarpEnabled = kawarpToggle.checked;
-    chrome.storage.local.set({ kawarpEnabled });
-    relay({ kawarpEnabled });
+    if (kawarpToggle.checked) {
+      kawarpToggle.checked = false; // stays off until "OK, turn on" is pressed
+      openGpuNotice();
+      return;
+    }
+    chrome.storage.local.set({ kawarpEnabled: false });
+    relay({ kawarpEnabled: false });
   });
 
   eqToggle.addEventListener('change', () => {

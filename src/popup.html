@@ -907,6 +907,23 @@
     .home-card[data-feature="spotify-canvas"].is-animated .card-icon-animated { transform: translate(-50%, -50%) scale(1.08); }
     .home-card-arrow { color: #777587; font-size: 13px; }
     .home-support { margin: 0 1px 7px; padding: 8px 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; border: 1px solid rgba(255,255,255,.06); border-radius: 12px; background: linear-gradient(100deg, rgba(255,255,255,.025), rgba(255,255,255,.045), rgba(255,255,255,.025)); }
+    .rs-pill { --rs-accent: #4ade80; position: relative; isolation: isolate; overflow: hidden; width: 100%; display: flex; align-items: center; gap: 10px; margin: 0 0 9px; padding: 8px 11px 8px 9px; border-radius: 999px; border: 1px solid rgba(255,255,255,.09); background: linear-gradient(100deg, rgba(31,31,42,.79), rgba(19,19,27,.9)); color: var(--text-0); font: inherit; text-align: left; cursor: pointer; box-shadow: inset 0 1px rgba(255,255,255,.07); transition: border-color .2s, background .2s, box-shadow .2s, transform .2s; }
+    .rs-pill:hover, .rs-pill:focus-visible { border-color: color-mix(in srgb, var(--rs-accent), transparent 58%); transform: translateY(-1px); }
+    .rs-pill:active { transform: translateY(0); }
+    .rs-pill-icon { width: 30px; height: 30px; flex: none; display: grid; place-items: center; border-radius: 50%; background: rgba(255,255,255,.06); color: #9a99ab; transition: background .2s, color .2s; }
+    .rs-pill-icon svg { width: 16px; height: 16px; }
+    .rs-pill-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+    .rs-pill-title { font-size: 11.5px; font-weight: 650; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .rs-pill-desc { color: #a3a2b1; font-size: 9px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .rs-switch { position: relative; width: 34px; height: 20px; flex: none; border-radius: 999px; background: rgba(255,255,255,.13); transition: background .2s; }
+    .rs-switch i { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.4); transition: transform .2s; }
+    .rs-pill[aria-checked="true"] { border-color: color-mix(in srgb, var(--rs-accent), transparent 55%); background: radial-gradient(ellipse at 0% 50%, rgba(74,222,128,.17), transparent 60%), linear-gradient(100deg, rgba(25,36,31,.92), rgba(17,22,20,.95)); box-shadow: inset 0 1px rgba(255,255,255,.08), 0 8px 20px -14px var(--rs-accent); }
+    .rs-pill[aria-checked="true"] .rs-pill-icon { background: rgba(74,222,128,.17); color: var(--rs-accent); }
+    .rs-pill[aria-checked="true"] .rs-switch { background: var(--rs-accent); }
+    .rs-pill[aria-checked="true"] .rs-switch i { transform: translateX(14px); }
+    .rs-notice { margin: 0 1px 10px; padding: 9px 11px; border-radius: 12px; border: 1px solid rgba(74,222,128,.28); background: rgba(34,197,94,.09); color: #b9e9c9; font-size: 10px; line-height: 1.45; }
+    .rs-notice[hidden] { display: none; }
+    body:not(.rs-on) .rs-notice { display: none; }
     .home-support-copy { color: #9b9aaa; font-size: 9px; white-space: nowrap; }
     .home-support-actions { display: flex; align-items: center; gap: 6px; }
     .support-pill { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-height: 27px; padding: 0 9px; border: 1px solid rgba(255,255,255,.1); border-radius: 999px; color: #d8d7e1; background: rgba(255,255,255,.055); font: 600 9px/1 system-ui, sans-serif; text-decoration: none; white-space: nowrap; transition: transform .18s, background .18s, border-color .18s, box-shadow .18s; }
@@ -988,6 +1005,49 @@
     .footer .home-support { max-width: 100%; }
     .footer-credit { padding: 6px 0 1px; color: var(--text-3); font-size: 9.5px; letter-spacing: .02em; text-align: center; }
     .footer-credit span { color: #f17691; }
+
+    /* GPU-acceleration notice shown before Kawarp is switched on */
+    .gpu-overlay {
+      position: fixed; inset: 0; width: 340px; max-height: 600px;
+      background: rgba(10,10,13,0.94);
+      z-index: 2100; display: none; overflow-y: auto;
+      align-items: flex-start; justify-content: center;
+    }
+    .gpu-overlay.open { display: flex; }
+    .gpu-overlay::-webkit-scrollbar { display: none; width: 0; }
+    .gpu-overlay { scrollbar-width: none; }
+    .gpu-panel { width: 100%; padding: 20px 18px 18px; }
+    .gpu-panel h2 { font-size: 17px; font-weight: 800; letter-spacing: -0.01em; margin: 10px 0 8px; }
+    .gpu-chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 9.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+      color: #a3adff; background: var(--accent-soft); border: 1px solid var(--accent-border);
+      border-radius: 6px; padding: 3px 8px;
+    }
+    .gpu-lead { font-size: 12px; line-height: 1.6; color: var(--text-1); margin-bottom: 14px; }
+    .gpu-card {
+      padding: 12px 13px; background: var(--bg-2); border: 1px solid var(--line-soft);
+      border-radius: var(--radius-sm); margin-bottom: 10px;
+      font-size: 11.5px; line-height: 1.6; color: var(--text-1); user-select: text;
+    }
+    .gpu-card[hidden] { display: none; }
+    .gpu-card-title { font-size: 12px; font-weight: 700; color: var(--text-0); margin-bottom: 6px; }
+    .gpu-card ol { margin: 0; padding-left: 18px; }
+    .gpu-card li { margin-bottom: 4px; }
+    .gpu-card b { color: var(--text-0); font-weight: 700; }
+    .gpu-card .gpu-hint { margin-top: 8px; color: var(--text-2); }
+    .gpu-note { font-size: 11px; line-height: 1.55; color: var(--text-2); margin: 4px 0 16px; }
+    .gpu-actions { display: flex; gap: 9px; }
+    .gpu-actions button {
+      flex: 1; font-family: inherit; font-size: 12.5px; font-weight: 700;
+      padding: 10px 12px; border-radius: var(--radius-sm); cursor: pointer;
+      transition: filter .15s, background .15s;
+    }
+    .gpu-cancel { background: transparent; color: var(--text-1); border: 1px solid var(--line); }
+    .gpu-cancel:hover { background: rgba(255,255,255,0.05); }
+    .gpu-ok { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; border: 1px solid transparent; }
+    .gpu-ok:hover { filter: brightness(1.1); }
+
     .cache-preview-overlay, .brave-overlay { position: fixed; }
     .cache-list { max-height: 260px; }
     select, input[type="text"], input[type="password"], input[type="number"] { max-width: 100%; }
@@ -1101,11 +1161,11 @@
     <div class="row" style="margin-top:10px;">
       <span class="row-label">Fluid Background (Kawarp)</span>
       <label class="switch">
-        <input type="checkbox" id="kawarpToggle" checked/>
+        <input type="checkbox" id="kawarpToggle"/>
         <span class="slider"></span>
       </label>
     </div>
-    <p class="theme-sub">Animates the page's blurred backdrop into a slow, fluid warp of the current artwork's colors — similar to Apple Music's now-playing background. Uses WebGL; turn off to save GPU/battery.</p>
+    <p class="theme-sub">Animates the page's blurred backdrop into a slow, fluid warp of the current artwork's colors — similar to Apple Music's now-playing background. Off by default. Uses a little graphics power (WebGL).</p>
 
     <details class="kawarp-details" id="kawarpDetails">
       <summary>Fine-tune fluid background</summary>
@@ -1122,8 +1182,8 @@
         </div>
 
         <div class="kawarp-slider-row">
-          <div class="kw-label-row"><span>Blur passes</span><span class="kw-val" id="kwBlurPassesVal">8</span></div>
-          <input type="range" id="kwBlurPasses" min="1" max="40" step="1" value="8"/>
+          <div class="kw-label-row"><span>Blur passes</span><span class="kw-val" id="kwBlurPassesVal">6</span></div>
+          <input type="range" id="kwBlurPasses" min="1" max="40" step="1" value="6"/>
         </div>
 
         <div class="kawarp-slider-row">
@@ -1585,6 +1645,42 @@
     </div>
     <div class="cache-preview-actions">
       <button class="cache-preview-btn" id="cachePreviewOpenTab">Open in new tab</button>
+    </div>
+  </div>
+
+
+  <div class="gpu-overlay" id="gpuOverlay" role="dialog" aria-modal="true" aria-labelledby="gpuTitle">
+    <div class="gpu-panel">
+      <span class="gpu-chip">Fluid Background</span>
+      <h2 id="gpuTitle">Before you turn this on</h2>
+      <p class="gpu-lead">The fluid background is drawn on your graphics card (WebGL), so it will consume a little graphics power while a song plays. For it to run smoothly, graphics acceleration should be turned on in your browser.</p>
+
+      <div class="gpu-card" id="gpuFirefox" hidden>
+        <div class="gpu-card-title">Check this in Firefox</div>
+        <ol>
+          <li>Open <b>Settings</b> &rarr; <b>General</b> &rarr; <b>Tabs and browsing</b> &rarr; <b>Performance</b>.</li>
+          <li>If the fluid background feels laggy or glitchy, turn <b>off</b> &ldquo;Use recommended performance settings&rdquo; and make sure <b>&ldquo;Use hardware acceleration when available&rdquo;</b> is checked.</li>
+          <li>Restart Firefox after changing it.</li>
+        </ol>
+        <div class="gpu-hint">If everything already runs smoothly, the recommended setting is fine &mdash; leave it as it is.</div>
+      </div>
+
+      <div class="gpu-card" id="gpuChromium" hidden>
+        <div class="gpu-card-title" id="gpuChromiumTitle">Check this in your browser</div>
+        <ol>
+          <li>Open <b id="gpuChromiumPath">Settings &rarr; System</b>.</li>
+          <li>Make sure <b>&ldquo;Use graphics acceleration when available&rdquo;</b> (called &ldquo;Use hardware acceleration when available&rdquo; in some browsers) is <b>turned on</b>.</li>
+          <li>If you changed it, restart the browser.</li>
+        </ol>
+        <div class="gpu-hint">Tip: type &ldquo;acceleration&rdquo; into the Settings search box to find it quickly.</div>
+      </div>
+
+      <p class="gpu-note">You can switch this off again from the same toggle at any time if you notice extra heat or battery use.</p>
+
+      <div class="gpu-actions">
+        <button type="button" class="gpu-cancel" id="gpuCancel">Cancel</button>
+        <button type="button" class="gpu-ok" id="gpuOk">OK, turn on</button>
+      </div>
     </div>
   </div>
 

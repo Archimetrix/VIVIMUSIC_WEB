@@ -31,13 +31,19 @@
   const CATEGORIES = ['music_offtopic'];
 
   let enabled = true;
-  chrome.storage.local.get({ sponsorBlockEnabled: true }, (s) => {
-    enabled = s.sponsorBlockEnabled !== false;
+  let userEnabled = true;   // the person's own SponsorBlock choice
+  let saverOn = false;      // Optimized & resource saving mode overrides it
+  const recompute = () => { enabled = userEnabled && !saverOn; };
+  chrome.storage.local.get({ sponsorBlockEnabled: true, resourceSaverEnabled: false }, (s) => {
+    userEnabled = s.sponsorBlockEnabled !== false;
+    saverOn = s.resourceSaverEnabled === true;
+    recompute();
   });
   chrome.runtime.onMessage.addListener((msg) => {
-    if (msg.type === 'VIVI_SETTINGS' && 'sponsorBlockEnabled' in msg) {
-      enabled = msg.sponsorBlockEnabled !== false;
-    }
+    if (msg.type !== 'VIVI_SETTINGS') return;
+    if ('sponsorBlockEnabled' in msg) userEnabled = msg.sponsorBlockEnabled !== false;
+    if ('resourceSaverEnabled' in msg) saverOn = msg.resourceSaverEnabled === true;
+    recompute();
   });
 
   function withTimeout(promise, ms) {

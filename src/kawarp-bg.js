@@ -35,6 +35,8 @@
   let pauseWhenInactive = true; // "Pause when inactive" setting
   let pausedForVisibility = false;
   let brightness = 0.5;       // CSS brightness on the canvas (1 = unchanged)
+  let opacityOpt = 1.0;       // mirrors the Kawarp opacity setting
+  let staticBgTimer = null;
 
   function log(...a) { console.log('[Vivi Kawarp]', ...a); }
   function warn(...a) { console.debug('[Vivi Kawarp]', ...a); }
@@ -87,9 +89,10 @@
       return null;
     }
     try {
+      if (pendingOptions && pendingOptions.opacity !== undefined) opacityOpt = Number(pendingOptions.opacity);
       kawarp = new window.Kawarp(canvas, Object.assign({
         warpIntensity: 1.0,
-        blurPasses: 5,
+        blurPasses: 6,
         animationSpeed: 4.15,
         transitionDuration: 0,
         saturation: 2.6,
@@ -112,11 +115,35 @@
     return kawarp;
   }
 
+  // While Kawarp is fully opaque it completely covers #vivi-bg-img (the static
+  // blur(100px) layer, ~3.5x the viewport in area). Hidden under an animating
+  // canvas that layer is still composited/filtered on every presented frame,
+  // which is pure wasted GPU. Take it out of rendering while it can't be seen
+  // and put it straight back whenever Kawarp is hidden, disabled or translucent.
+  function setStaticBgHidden(hide) {
+    const el = document.getElementById('vivi-bg-img');
+    if (!el) return;
+    if (hide) el.style.display = 'none';
+    else el.style.removeProperty('display');
+  }
+  function refreshStaticBg() {
+    clearTimeout(staticBgTimer);
+    staticBgTimer = null;
+    const covering = enabled && canvas && canvas.style.opacity === '1' && opacityOpt >= 0.99;
+    if (!covering) { setStaticBgHidden(false); return; }
+    // wait for the 0.6s fade-in to finish so there is no flash of empty bg
+    staticBgTimer = setTimeout(() => {
+      staticBgTimer = null;
+      if (enabled && canvas && canvas.style.opacity === '1' && opacityOpt >= 0.99) setStaticBgHidden(true);
+    }, 700);
+  }
+
   function showCanvas() {
     if (!canvas) return;
     // Restore the smooth fade-in for the normal "artwork just loaded" case.
     canvas.style.transition = 'opacity 0.6s ease-in-out';
     canvas.style.opacity = '1';
+    refreshStaticBg();
   }
   function hideCanvas() {
     if (!canvas) return;
@@ -126,6 +153,7 @@
     // whatever page the person just navigated back to.
     canvas.style.transition = 'none';
     canvas.style.opacity = '0';
+    refreshStaticBg();
   }
 
   // Strip YouTube Music's size suffix (=w60-h60-l90-rj etc.) so the same cover
@@ -198,6 +226,10 @@
     }
     pendingOptions = Object.assign({}, pendingOptions, kawarpOpts);
     kawarp?.setOptions(kawarpOpts);
+    if (kawarpOpts.opacity !== undefined && Number.isFinite(Number(kawarpOpts.opacity))) {
+      opacityOpt = Number(kawarpOpts.opacity);
+      refreshStaticBg();
+    }
   }
 
   function setPauseWhenInactive(next) {
@@ -302,7 +334,7 @@
     setOptions,
     setPauseWhenInactive,
     dispose,
-    version: 'optimized-1',
+    version: 'optimized-2',
   };
 
   log('ready — optimized build (warp 1/4 res, shader brightness)');

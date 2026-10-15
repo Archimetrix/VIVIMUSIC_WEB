@@ -277,6 +277,23 @@
     lastfmDelayMinutes: 3,      
   };
   let lastfmSettings = { ...LASTFM_DEFAULTS };
+
+  // ── Optimized & resource saving mode ──
+  // While on, this overrides (never overwrites) the saved choices for Kawarp,
+  // Apple Music artwork fetching/caching, Last.fm, SponsorBlock and the
+  // equalizer. The *Enabled variables below hold what the person picked; the
+  // effective values the rest of the file reads are derived from them, so
+  // switching the mode off restores exactly what they had.
+  let resourceSaver = false;
+  let appleUserEnabled = true;
+  let sponsorUserEnabled = true;
+  let lastfmUserEnabled = false;
+  function applyResourceSaverState() {
+    appleCanvasEnabled = appleUserEnabled && !resourceSaver;
+    sponsorBlockEnabled = sponsorUserEnabled && !resourceSaver;
+    lastfmSettings.lastfmEnabled = lastfmUserEnabled && !resourceSaver;
+    updateKawarpVisibility(); // Kawarp + equalizer
+  }
   let lastfmCurrentKey = null;
   let lastfmStartedAt  = 0;     
   let lastfmScrobbled  = false;
@@ -473,6 +490,7 @@
   // *resolve* them, but nothing further is downloaded or stored beyond that.
   const appleFetchInflight = new Map(); // trackKey -> Promise<{videoUrl,imageUrl}|null>
   function ensureAppleCached(track, trackKey) {
+    if (resourceSaver) return Promise.resolve(null); // no Apple lookups / cache writes in resource saving mode
     if (appleFetchInflight.has(trackKey)) return appleFetchInflight.get(trackKey);
     const job = (async () => {
       try {
@@ -2067,17 +2085,17 @@
   // and artwork the animated backdrop would otherwise compete with. This tracks
   // the user's actual toggle state separately so route changes can gate the
   // *effective* on/off state without losing what the person picked in settings.
-  let kawarpUserEnabled = true;
+  let kawarpUserEnabled = false; // off by default; the popup turns it on
   let eqUserEnabled = false;
   function updateKawarpVisibility() {
     const active = isMainPlayerPageActive();
-    window.__viviKawarp?.setEnabled(kawarpUserEnabled && active);
+    window.__viviKawarp?.setEnabled(kawarpUserEnabled && !resourceSaver && active);
     // Reuses the same detection this function already does for Kawarp
     // (including the immediate MutationObserver added above) so the EQ
     // toggle button disappears the instant the player is minimized too,
     // instead of staying visible over Home/Explore/etc.
-    window.__viviEqualizer?.setAllowed(eqUserEnabled);
-    window.__viviEqualizer?.setVisible(eqUserEnabled && active);
+    window.__viviEqualizer?.setAllowed(eqUserEnabled && !resourceSaver);
+    window.__viviEqualizer?.setVisible(eqUserEnabled && !resourceSaver && active);
   }
 
   // Delay Canvas reveal by ~1s specifically when reopening the full player
@@ -2559,6 +2577,7 @@
   }
 
   async function prefetchNextTrack() {
+    if (resourceSaver) return;
     const next = getNextQueuedTrack();
     if (!next) return;
     const key = `${next.artist}—${next.song}`;
@@ -2758,23 +2777,26 @@
 
   chrome.storage.local.get(LASTFM_DEFAULTS, (stored) => {
     lastfmSettings = { ...LASTFM_DEFAULTS, ...stored };
+    lastfmUserEnabled = lastfmSettings.lastfmEnabled === true;
+    applyResourceSaverState();
   });
 
   chrome.storage.local.get({
     enabled: true, themeEnabled: true, imageOnlyMode: false, spotifyCanvasEnabled: true, canvasPriority: 'apple', sponsorBlockEnabled: true,
-    kawarpEnabled: true, kawarpPauseWhenInactive: true, eqEnabled: false,
-    kawarpWarpIntensity: 1.0, kawarpBlurPasses: 5, kawarpAnimationSpeed: 4.15,
+    kawarpEnabled: false, kawarpPauseWhenInactive: true, eqEnabled: false, resourceSaverEnabled: false,
+    kawarpWarpIntensity: 1.0, kawarpBlurPasses: 6, kawarpAnimationSpeed: 4.15,
     kawarpTransitionDuration: 0, kawarpSaturation: 2.6, kawarpDithering: 0.034, kawarpOpacity: 1.0, kawarpBrightness: 0.5,
   }, ({
     enabled, themeEnabled, imageOnlyMode: imgOnly, spotifyCanvasEnabled: spCanvas, canvasPriority: canvasPrio, sponsorBlockEnabled: sbEnabled,
-    kawarpEnabled: kwEnabled, kawarpPauseWhenInactive: kwPause, eqEnabled: eqEnabled_,
+    kawarpEnabled: kwEnabled, kawarpPauseWhenInactive: kwPause, eqEnabled: eqEnabled_, resourceSaverEnabled: rsEnabled,
     kawarpWarpIntensity, kawarpBlurPasses, kawarpAnimationSpeed, kawarpTransitionDuration, kawarpSaturation, kawarpDithering, kawarpOpacity, kawarpBrightness,
   }) => {
     bindCanvasTrackTransitionGuard();
-    appleCanvasEnabled = enabled !== false;
+    resourceSaver = rsEnabled === true;
+    appleUserEnabled = enabled !== false;
     spotifyCanvasEnabled = spCanvas !== false;
     canvasPriority = canvasPrio === 'apple' ? 'apple' : 'spotify';
-    sponsorBlockEnabled = sbEnabled !== false;
+    sponsorUserEnabled = sbEnabled !== false;
     themeUserEnabled = themeEnabled;
     imageOnlyMode = imgOnly;
     applyTheme(themeEnabled);
@@ -2789,9 +2811,9 @@
       brightness: kawarpBrightness,
     });
     window.__viviKawarp?.setPauseWhenInactive(kwPause !== false);
-    kawarpUserEnabled = kwEnabled !== false;
+    kawarpUserEnabled = kwEnabled === true;
     eqUserEnabled = eqEnabled_ === true;
-    updateKawarpVisibility();
+    applyResourceSaverState();
     // Pre-create the background element immediately
     if (themeEnabled) ensureBgEl();
     watchBgEl();
@@ -3068,7 +3090,8 @@
       // rather than waiting up to POLL_INTERVAL for the next safety-net tick.
       let reCheckCanvas = false;
       if ('enabled' in msg) {
-        appleCanvasEnabled = msg.enabled !== false;
+        appleUserEnabled = msg.enabled !== false;
+        appleCanvasEnabled = appleUserEnabled && !resourceSaver;
         reCheckCanvas = true;
       }
       if ('themeEnabled' in msg) {
@@ -3083,6 +3106,13 @@
         canvasPriority = msg.canvasPriority === 'apple' ? 'apple' : 'spotify';
         reCheckCanvas = true;
       }
+      if ('resourceSaverEnabled' in msg) {
+        resourceSaver = msg.resourceSaverEnabled === true;
+        applyResourceSaverState();
+        reCheckCanvas = true; // re-run artwork selection under the new rules
+        const sbTrack = getCurrentTrack();
+        if (sbTrack) loadSponsorSegmentsForTrack(sbTrack).catch((e) => warn('SponsorBlock: track load failed', e?.message));
+      }
       if (reCheckCanvas) {
         const track = getCurrentTrack();
         fadeOutCurrentOverlay();
@@ -3094,7 +3124,8 @@
         if (!pollTimer) startPolling();
       }
       if ('sponsorBlockEnabled' in msg) {
-        sponsorBlockEnabled = msg.sponsorBlockEnabled !== false;
+        sponsorUserEnabled = msg.sponsorBlockEnabled !== false;
+        sponsorBlockEnabled = sponsorUserEnabled && !resourceSaver;
         const track = getCurrentTrack();
         if (track) loadSponsorSegmentsForTrack(track).catch((e) => warn('SponsorBlock: track load failed', e?.message));
       }
@@ -3107,7 +3138,7 @@
         }
       }
       if ('kawarpEnabled' in msg) {
-        kawarpUserEnabled = msg.kawarpEnabled !== false;
+        kawarpUserEnabled = msg.kawarpEnabled === true;
         updateKawarpVisibility();
       }
       if ('eqEnabled' in msg) {
@@ -3141,6 +3172,10 @@
       Object.keys(LASTFM_DEFAULTS).forEach((k) => {
         if (k in msg) lastfmSettings[k] = msg[k];
       });
+      if ('lastfmEnabled' in msg) {
+        lastfmUserEnabled = msg.lastfmEnabled === true;
+        lastfmSettings.lastfmEnabled = lastfmUserEnabled && !resourceSaver;
+      }
       if (Object.keys(LASTFM_DEFAULTS).some((k) => k in msg)) {
         const track = getCurrentTrack();
         if (track) watchLikeButton(track);

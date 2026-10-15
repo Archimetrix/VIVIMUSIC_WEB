@@ -91,7 +91,7 @@
   }
 
   chrome.storage.local.get(
-    { lyricsEnabled: true, autoSwitchLyrics: true, lyricsShowForVideos: false, dancerOnNotFound: true, lyricsAlign: 'center', lyricsAnimationStyle: 'apple', lyricsFont: 'default', lyricsRoman: 'off', lyricsRomanJa: true, lyricsRomanLangs: null },
+    { lyricsEnabled: true, autoSwitchLyrics: true, lyricsShowForVideos: false, dancerOnNotFound: true, resourceSaverEnabled: false, lyricsAlign: 'center', lyricsAnimationStyle: 'apple', lyricsFont: 'default', lyricsRoman: 'off', lyricsRomanJa: true, lyricsRomanLangs: null },
     (s) => { settings = s; applyLyricsStyleClasses(); }
   );
 
@@ -129,8 +129,9 @@
         w.classList.remove('vivi-lyrics-word-glowing', 'vivi-lyrics-word-bouncing', 'vivi-lyrics-syl-swell');
       });
     }
-    if ('dancerOnNotFound' in msg) {
-      settings.dancerOnNotFound = msg.dancerOnNotFound;
+    if ('dancerOnNotFound' in msg || 'resourceSaverEnabled' in msg) {
+      if ('dancerOnNotFound' in msg) settings.dancerOnNotFound = msg.dancerOnNotFound;
+      if ('resourceSaverEnabled' in msg) settings.resourceSaverEnabled = msg.resourceSaverEnabled === true;
       // If the panel is currently showing the "no lyrics found" state,
       // re-render it immediately so the toggle takes effect without
       // waiting for the next track.
@@ -456,7 +457,7 @@
     const wrap = document.createElement('div');
     wrap.className = 'vivi-lyrics-video-blocked';
 
-    const url = getDancerUrl();
+    const url = settings.resourceSaverEnabled ? null : getDancerUrl(); // no looping video in resource saving mode
     if (url) {
       const video = document.createElement('video');
       video.className = 'vivi-lyrics-dancer';
@@ -494,7 +495,7 @@
   }
 
   function renderNotFoundState(panel) {
-    if (settings.dancerOnNotFound) {
+    if (settings.dancerOnNotFound && !settings.resourceSaverEnabled) {
       renderDancerState(panel, "No lyrics found for this track.", null);
     } else {
       panel.innerHTML = `<div class="vivi-lyrics-empty">No lyrics found for this track.</div>`;

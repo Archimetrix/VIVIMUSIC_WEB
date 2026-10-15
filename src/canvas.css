@@ -365,9 +365,9 @@ ytmusic-player .vivi-canvas-slot {
   opacity: 0.5;
   transform: scale(0.94);
   transform-origin: left center;
-  filter: blur(calc(var(--vivi-d, 1) * 1.1px));
+  filter: blur(min(calc(var(--vivi-d, 1) * 0.9px), 2.5px));
   transition: color 0.4s ease, opacity 0.4s ease, filter 0.5s cubic-bezier(0.22, 0.8, 0.24, 1), transform 0.5s cubic-bezier(0.22, 0.8, 0.24, 1);
-  will-change: filter, transform, opacity;
+  will-change: auto;
 }
 .vivi-lyrics-list.vivi-lyrics-anim-apple .vivi-lyrics-line.vivi-lyrics-active {
   font-size: 40px;
@@ -838,6 +838,18 @@ html.vivi-theme-on #mini-guide-background {
   backdrop-filter: blur(var(--ui-blur, 10px)) !important;
   -webkit-backdrop-filter: blur(var(--ui-blur, 10px)) !important;
   opacity: 1 !important;
+}
+
+/* Keep theme.css's low-GPU rule in force. The block above is meant for the
+   normal pages; while the full player is open these three sit directly on the
+   live Kawarp canvas, and a backdrop-filter over a surface that repaints ~30x/s
+   forces the blur to be re-computed on every frame. This must come AFTER the
+   block above (same specificity, both !important) so it wins in every browser. */
+html.vivi-theme-on #layout[player-page-open] #guide-wrapper,
+html.vivi-theme-on #layout[player-page-open] #nav-bar-background,
+html.vivi-theme-on #layout[player-page-open] #mini-guide-background {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 

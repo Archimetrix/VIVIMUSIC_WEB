@@ -1567,7 +1567,7 @@ ytmusic-player-page::before {
 }
 
 ytmusic-player-page:not([is-mweb-modernization-enabled]) {
-  background: none !important;
+  background: none;
   backdrop-filter: blur(60px);
 }
 
@@ -2124,4 +2124,178 @@ ytmusic-multi-row-list-item-renderer.ytmusic-shelf-renderer {
 
 .subtitle.ytmusic-multi-row-list-item-renderer {
   color: var(--text-secondary);
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LOW-GPU OVERRIDES (v9.1.3)
+   Same look, a fraction of the GPU cost. Appended last so it wins over the
+   rules above. Nothing here changes layout or colours — only HOW the blur is
+   produced.
+
+   1. Background blur: instead of blurring a full-screen, 1.35x-scaled layer
+      with a 180px radius (very expensive, re-done on every composite), draw
+      the artwork on a layer 1/8 the size, blur it with a 1/8 radius (22px),
+      then scale it back up 8x. Visually the same soft colour wash, but the
+      GPU only touches 1/64th of the pixels. The result is a static texture
+      that is rasterised once per track.
+   2. Removed the blur(60px) backdrop-filter on the whole player page.
+   3. No backdrop-filter on the nav bar / sidebar / player bar while the full
+      player is open (they sit on top of an already-blurred background, so
+      blurring it again is invisible but costs GPU every frame).
+   4. Lyric lines: small, capped blur and no permanent will-change layers.
+   5. Lighter glow animation on active words.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --bg-down: 8;          /* downscale factor for the background layer */
+  --bg-blur-cheap: calc(var(--bg-blur) / var(--bg-down));
+}
+
+/* 1 ── Cheap background (Home / Search / full player) */
+#browse-page::before,
+#search-page::before {
+  content: "";
+  position: fixed;
+  inset: auto;
+  top: 0;
+  left: 0;
+  width: calc(100vw * var(--bg-scale) / var(--bg-down));
+  height: calc(120vh * var(--bg-scale) / var(--bg-down));
+  background: var(--blyrics-background-img);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  transform-origin: 0 0;
+  transform:
+    translate(calc(-100vw * (var(--bg-scale) - 1) / 2), calc(-120vh * (var(--bg-scale) - 1) / 2))
+    scale(var(--bg-down));
+  filter: blur(var(--bg-blur-cheap)) saturate(var(--bg-saturate)) brightness(var(--bg-brightness));
+  z-index: -50;
+  will-change: auto;
+  contain: strict;
+  pointer-events: none;
+}
+
+/* NOTE: ytmusic-player-page::before is deliberately NOT overridden here.
+   The original rule never sets `content`, so that pseudo-element is not drawn
+   at all, which is what lets the Kawarp layer (#vivi-bg-layer) show through
+   the player page. Forcing `content` made an opaque static layer that hid it. */
+
+/* Mobile-width player: 30px blur on a oversized layer → same downscale trick */
+ytmusic-player-page[is-mweb-modernization-enabled] #main-panel::before {
+  inset: auto;
+  top: -5rem;
+  left: -5rem;
+  width: calc((100vw + 10rem) / 4);
+  height: calc((100vh + 10rem) / 4);
+  transform-origin: 0 0;
+  transform: scale(4);
+  filter: blur(7.5px) brightness(var(--bg-brightness));
+  will-change: auto;
+  contain: strict;
+  pointer-events: none;
+}
+
+/* The background image never interpolates, so this transition + will-change
+   only kept an extra compositor layer alive for nothing. */
+#browse-page::before,
+#search-page::before,
+ytmusic-player-page[is-mweb-modernization-enabled] #main-panel::before {
+  transition: none;
+  will-change: auto;
+}
+
+/* 2 ── Whole-page 60px backdrop blur (page background is already `none`) */
+ytmusic-player-page:not([is-mweb-modernization-enabled]) {
+  background: none;            /* was !important; must be animatable below */
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Smooth open / close of the full player.
+   The 60px backdrop blur used to hide Home behind the translucent player
+   page while it slid in/out. With it gone, Home (cards, shelves) showed
+   through un-blurred and flickered. Instead, a cheap solid cover (no blur,
+   no extra layer) is held while the page slides, then fades out to reveal
+   the Kawarp / blurred background underneath. */
+@keyframes vivi-pp-cover-open {
+  0%, 75% { background-color: rgb(12, 12, 12); }
+  100%    { background-color: rgba(12, 12, 12, 0); }
+}
+@keyframes vivi-pp-cover-close {
+  0%, 85% { background-color: rgb(12, 12, 12); }
+  100%    { background-color: rgb(12, 12, 12); }
+}
+ytmusic-app-layout[player-page-open] ytmusic-player-page:not([is-mweb-modernization-enabled]) {
+  animation: vivi-pp-cover-open 1s ease-out backwards;
+}
+ytmusic-app-layout:not([player-page-open]) ytmusic-player-page:not([is-mweb-modernization-enabled]) {
+  animation: vivi-pp-cover-close 0.8s linear both;
+}
+
+/* 3 ── No glass blur on chrome while the full player is open */
+html.vivi-theme-on #layout[player-page-open] #guide-wrapper,
+html.vivi-theme-on #layout[player-page-open] #nav-bar-background,
+html.vivi-theme-on #layout[player-page-open] #mini-guide-background,
+#layout[player-page-open] ytmusic-player-bar,
+ytmusic-app-layout[player-page-open] ytmusic-player-bar,
+ytmusic-player-page .autoscroll-resume-button,
+ytmusic-player-page .blyrics-footer__container,
+ytmusic-player-page .blyrics-footer__discord,
+ytmusic-player-page ytmusic-tabs.stuck {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Slightly lighter glass elsewhere (Home, Search, dialogs) */
+:root { --ui-blur: 6px; }
+
+/* 4 ── Lyrics: small, capped blur, no always-on layers */
+.blyrics--line,
+.blyrics-container .blyrics--active ~ .blyrics--line,
+.blyrics-footer {
+  filter: blur(2px);
+  will-change: auto;
+}
+.blyrics--line:hover,
+.blyrics-container[data-sync='none'] .blyrics--line,
+.blyrics-container .blyrics--line.blyrics--pre-animating,
+.blyrics--line.blyrics--active.blyrics--animating,
+.blyrics-container.blyrics-user-scrolling .blyrics--line,
+.blyrics-footer:hover {
+  filter: none !important;
+}
+
+/* 5 ── Lighter glow (was 1.2rem drop-shadow animated per word) */
+@keyframes blyrics-glow {
+  0%  { filter: drop-shadow(0 0 0.5rem var(--blyrics-glow-color)); }
+  to  { filter: drop-shadow(0 0 0rem var(--blyrics-glow-color)); }
+}
+
+
+/* Stray 1px vertical divider next to the sidebar (full height, x = 72px) */
+html.vivi-theme-on #mini-guide-background,
+html.vivi-theme-on #guide-wrapper,
+html.vivi-theme-on #mini-guide,
+html.vivi-theme-on #guide-content,
+html.vivi-theme-on #nav-bar-background,
+html.vivi-theme-on #layout[player-page-open] #guide-wrapper,
+html.vivi-theme-on #layout[player-page-open] #mini-guide-background {
+  border: 0 !important;
+  border-right: 0 !important;
+  box-shadow: none !important;
+}
+
+
+/* Open-flash fix: hide the page underneath the full player by every route
+   (#content AND the content slot, with or without the mweb attribute), once
+   the slide-in has finished, so Home can never show through while the cover
+   above fades out. Closing removes the attribute, so it returns instantly. */
+ytmusic-app-layout[player-page-open] > #content,
+ytmusic-app-layout[player-page-open] > [slot=content],
+#layout[player-page-open] > #content,
+#layout[player-page-open] #content.ytmusic-app-layout {
+  visibility: hidden !important;
+  transition: visibility 0s linear 0.6s !important;
 }
