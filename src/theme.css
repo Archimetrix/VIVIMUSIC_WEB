@@ -2299,3 +2299,16 @@ ytmusic-app-layout[player-page-open] > [slot=content],
   visibility: hidden !important;
   transition: visibility 0s linear 0.6s !important;
 }
+
+
+/* Blank-Home fix: YT Music keeps `player-page-open` set after the player is
+   collapsed / you navigate back to Home. content.js flags that situation on
+   <html> and the page under the player is shown again. */
+html[vivi-player-closed] ytmusic-app-layout > #content,
+html[vivi-player-closed] ytmusic-app-layout > [slot=content],
+html[vivi-player-closed] #layout > #content,
+html[vivi-player-closed] #layout #content.ytmusic-app-layout,
+html[vivi-player-closed] ytmusic-app-layout[player-page-open]:not([is-mweb-modernization-enabled]) > #content {
+  visibility: visible !important;
+  transition: none !important;
+}

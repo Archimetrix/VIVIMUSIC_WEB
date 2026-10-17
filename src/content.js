@@ -2140,7 +2140,30 @@
     }, 1000);
   }
 
+  // Drives the CSS that hides Home/playlist pages under the full player.
+  // YT Music leaves `player-page-open` set after you collapse the player or
+  // navigate back to Home, which kept #content visibility:hidden (blank Home).
+  // This flag is set whenever the full player is NOT really covering the page,
+  // and theme.css then forces the page visible again.
+  function syncPlayerClosedFlag() {
+    try {
+      const path = window.location.pathname || '';
+      let covering = path === '/watch' || path.startsWith('/watch/');
+      if (covering) {
+        const pp = document.querySelector('ytmusic-player-page');
+        const ps = pp && pp.getAttribute('player-page-ui-state');
+        if (ps && ps !== 'FULL_PLAYER_VIEW' && ps !== 'TABS_VIEW') covering = false;
+        const us = document.querySelector('ytmusic-player')?.getAttribute('player-ui-state');
+        if (us && !['PLAYER_PAGE_OPEN', 'FULL_PLAYER'].includes(us)) covering = false;
+      }
+      const root = document.documentElement;
+      if (covering) root.removeAttribute('vivi-player-closed');
+      else root.setAttribute('vivi-player-closed', '');
+    } catch { /* no-op */ }
+  }
+
   function syncMainCanvasToRoute() {
+    syncPlayerClosedFlag();
     const player = document.querySelector(`.${MAIN_PLAYER_CLASS}`);
     const active = isMainPlayerPageActive();
 

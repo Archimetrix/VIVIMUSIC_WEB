@@ -417,10 +417,47 @@
     });
   }
 
+  // ── Stale native lyrics under Comments / Related ──────────────────────
+  // When the user leaves Lyrics for Comments/Related, YT Music keeps the old
+  // native lyrics node in #tab-renderer until the new tab's data arrives, and
+  // our un-hide on tab click made it visible (plain lyrics under "COMMENTS").
+  // We remember each such node together with its text at that moment and keep
+  // it hidden only while its text is unchanged. As soon as YTM replaces the
+  // node or reuses it for new content, it is shown normally, so nothing the
+  // new tab renders can ever stay hidden.
+  const staleNative = new Map(); // element -> textContent when marked
+  let staleTimer = null;
+
+  function reconcileStale() {
+    const host = findTabContentHost();
+    for (const [el, text] of Array.from(staleNative)) {
+      if (!el.isConnected || !host || el.parentElement !== host) { staleNative.delete(el); continue; }
+      if (el.textContent !== text) { staleNative.delete(el); el.style.display = ''; }
+    }
+    if (!staleNative.size && staleTimer) { clearInterval(staleTimer); staleTimer = null; }
+  }
+
+  function markStaleNative(host) {
+    staleNative.clear();
+    Array.from(host.children).forEach((c) => {
+      if (c.id === PANEL_ID) return;
+      staleNative.set(c, c.textContent);
+      c.style.display = 'none';
+    });
+    if (staleNative.size && !staleTimer) staleTimer = setInterval(reconcileStale, 150);
+  }
+
+  function clearStaleNative(host) {
+    staleNative.clear();
+    if (staleTimer) { clearInterval(staleTimer); staleTimer = null; }
+  }
+
   function restoreNativeLyricsContent(host) {
     if (!host) return;
+    reconcileStale();
     Array.from(host.children).forEach((child) => {
-      if (child.id !== PANEL_ID) child.style.display = '';
+      if (child.id === PANEL_ID) return;
+      child.style.display = staleNative.has(child) ? 'none' : '';
     });
     nudgeRelayout();
   }
@@ -553,6 +590,10 @@
       }
     } else if (document.getElementById(PANEL_ID)) {
       teardownPanel();
+    } else if (isLyricsTabActive() && staleNative.size) {
+      // Back on Lyrics with our panel off: native lyrics must be visible.
+      clearStaleNative(host);
+      Array.from(host.children).forEach((c) => { c.style.display = ''; });
     }
 
     ensureInfoButton();
@@ -1287,8 +1328,18 @@
     enableLyricsTabIfDisabled();
     const host = findTabContentHost();
     if (host) {
+      const label = (tab.textContent || '').trim().toLowerCase();
+      // Capture phase: YTM hasn't switched yet, so this is the tab we're leaving.
+      const leavingLyrics = isLyricsTabActive();
+      if (leavingLyrics && (label === 'comments' || label === 'related')) {
+        markStaleNative(host);
+      } else if (label === 'lyrics' || label === 'up next') {
+        clearStaleNative(host);
+      }
+      reconcileStale();
       Array.from(host.children).forEach((child) => {
-        if (child.id !== PANEL_ID) child.style.display = '';
+        if (child.id === PANEL_ID) return;
+        child.style.display = staleNative.has(child) ? 'none' : '';
       });
     }
     scheduleSync();
