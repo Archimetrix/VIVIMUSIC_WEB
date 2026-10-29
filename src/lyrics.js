@@ -448,9 +448,17 @@
     return res;
   }
 
+  // LRC header/metadata tags: [ar:..] [ti:..] [al:..] [by:..] [offset:..] [length: 03:45] [re:..] [ve:..]
+  // Any "[word:value]" line that is not a [mm:ss.xx] timestamp is metadata, never lyrics.
+  function stripLrcMetaTags(text) {
+    return String(text || '')
+      .replace(/^\s*\[[a-zA-Z_ ]+\s*:[^\]]*\]\s*$/gm, '')
+      .replace(/^\s*\[\d{1,2}:\d{2}(?:\.\d{1,3})?\]\s*/gm, '');
+  }
+
   function parsePlain(text) {
     if (!text || !text.trim()) return null;
-    const lines = text.split('\n').filter((l) => l.trim() !== '').map((t) => ({ text: t.trim() }));
+    const lines = text.split('\n').filter((l) => l.trim() !== '' && !/^\s*\[[a-zA-Z_ ]+\s*:[^\]]*\]\s*$/.test(l)).map((t) => ({ text: t.trim() }));
     if (lines.length === 0) return null;
     return { mode: 'plain', lines };
   }
@@ -715,7 +723,7 @@
           synced.provider = 'lrc.red';
           return synced;
         }
-        const plain = parsePlain(cleaned.replace(/^\[[a-z]{2}:.*\]$/gim, ''));
+        const plain = parsePlain(stripLrcMetaTags(cleaned));
         if (plain) { plain.provider = 'lrc.red'; return plain; }
       }
       return null;
@@ -899,20 +907,22 @@
     });
   }
 
-  // Priority providers answered with unsynced (plain) text only. Instead of
-  // showing it straight away, look at what ALL requested providers (priority
-  // and non-priority, they're already in flight) return for up to
-  // UNSYNCED_UPGRADE_MS and take the best synced result. Word/syllable sync
-  // ends the wait at once; a line-synced result is kept but we keep waiting
-  // out the window for something richer. Ties go to the higher-priority
-  // provider. Falls back to the plain text if nothing synced shows up.
-  function upgradeUnsynced(plainResult, jobDefs, orderedKeys) {
+  // Quality-first upgrade scan. Called when the current best is below word
+  // sync (plain or line). Looks at what ALL requested providers (priority and
+  // non-priority, plus Spotify when it was added for a plain result) return
+  // for up to `windowMs` and keeps the best sync level
+  // (syllable > word > line > plain). Equal quality: the higher-priority
+  // provider wins. Word/syllable sync ends the wait at once. If nothing
+  // better shows up, the current result stays.
+  function upgradeResult(current, jobs, orderedKeys, windowMs) {
     return new Promise((resolve) => {
-      let best = plainResult;
-      let bestPrio = -1;
-      let remaining = jobDefs.length;
+      let best = current;
+      const keyOf = (r) => providerKeyForName(r && r.provider);
+      const prioOf = (k) => (orderedKeys.includes(k) ? orderedKeys.indexOf(k) : 99);
+      let bestPrio = prioOf(keyOf(current));
+      let remaining = jobs.length;
       let done = false;
-      const timer = setTimeout(() => finish(), UNSYNCED_UPGRADE_MS);
+      const timer = setTimeout(() => finish(), windowMs);
 
       const finish = () => {
         if (done) return;
@@ -921,8 +931,9 @@
         resolve(best);
       };
 
-      jobDefs.forEach((job) => {
-        const prio = orderedKeys.includes(job.key) ? orderedKeys.indexOf(job.key) : 99;
+      if (!jobs.length) { finish(); return; }
+      jobs.forEach((job) => {
+        const prio = prioOf(job.key);
         job.promise
           .then((value) => {
             remaining--;
@@ -932,7 +943,7 @@
               if (vr > br || (vr === br && vr > MODE_RANK.plain && prio < bestPrio)) {
                 best = value;
                 bestPrio = prio;
-                log('unsynced upgraded by', job.key, value.mode);
+                log('upgraded by', job.key, value.mode);
               }
               if (MODE_RANK[best.mode] >= MODE_RANK.word) finish();
             }
@@ -979,36 +990,80 @@
   // this exact song). Purely an in-memory filter over which network
   // requests get made this call; nothing about it is cached or persisted
   // here — that bookkeeping lives in the UI layer.
-  async function fetchBestLyrics(track, opts) {
-    const excludeKeys = new Set((opts && opts.excludeKeys) || []);
-    const onUpdate = opts && opts.onUpdate;
+  // ── Per-song result cache (in memory, this page session) ──
+  // Only synced results are cached (a plain result should be re-raced next
+  // time in case a synced source has caught up). The key includes the
+  // exclusion list and the provider settings, so a Refetch or a settings
+  // change never serves a stale answer.
+  const RESULT_CACHE_MAX = 60;
+  const RESULT_CACHE_TTL_MS = 1000 * 60 * 60;
+  const resultCache = new Map();
+  const normKey = (x) => String(x || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  function cacheKeyFor(track, excludeKeys) {
+    return [
+      normKey(track.song), normKey(track.artist), Math.round(track.duration || 0),
+      [...excludeKeys].sort().join(','),
+      JSON.stringify(providerSettings),
+      priorityEnabled ? priorityOrder.join(',') : '-',
+    ].join('|');
+  }
+  function cacheGet(key) {
+    const hit = resultCache.get(key);
+    if (!hit) return null;
+    if (hit.expires < Date.now()) { resultCache.delete(key); return null; }
+    try { return structuredClone(hit.value); } catch { return null; }
+  }
+  function cachePut(key, value) {
+    if (!value || value.mode === 'plain') return;
+    try {
+      resultCache.set(key, { value: structuredClone(value), expires: Date.now() + RESULT_CACHE_TTL_MS });
+    } catch { return; }
+    while (resultCache.size > RESULT_CACHE_MAX) resultCache.delete(resultCache.keys().next().value);
+  }
+
+  // How long a line-synced priority result waits for word/syllable sync from
+  // any provider before being accepted.
+  const LINE_UPGRADE_MS = 1000;
+
+  // Flow:
+  //  1. Every enabled provider is requested in parallel (Spotify is not).
+  //  2. Priority ON: the priority providers are raced first (quality first,
+  //     list position breaks ties). If none has anything, the remaining
+  //     providers race. Priority OFF: all providers race.
+  //  3. Quality first across ALL providers: if the best is below word sync,
+  //     every provider's answer is scanned for a short window and the best
+  //     level wins (priority order breaks ties). Plain is only a last resort.
+  //  4. Spotify joins the scan when the best is plain, and is used on its own
+  //     when nothing at all was found.
+  async function resolveLyrics(track, excludeKeys, onUpdate) {
     const jobDefs = [];
-    if (providerSettings.lrcred && !excludeKeys.has('lrcred'))                 jobDefs.push({ key: 'lrcred', promise: fromLrcRed(track) });
-    if (providerSettings.betterlyricsTTML && !excludeKeys.has('betterlyricsTTML'))   jobDefs.push({ key: 'betterlyricsTTML', promise: fromBetterLyricsTTML(track) });
-    if (providerSettings.betterlyricsKugou && !excludeKeys.has('betterlyricsKugou'))  jobDefs.push({ key: 'betterlyricsKugou', promise: fromBetterLyricsKugou(track) });
-    if (providerSettings.betterlyricsPortato && !excludeKeys.has('betterlyricsPortato')) jobDefs.push({ key: 'betterlyricsPortato', promise: fromBetterLyricsPortato(track) });
-    if (providerSettings.lrclib && !excludeKeys.has('lrclib'))             jobDefs.push({ key: 'lrclib', promise: fromLrclib(track) });
-    if (providerSettings.betterlyricsLegacy && !excludeKeys.has('betterlyricsLegacy')) jobDefs.push({ key: 'betterlyricsLegacy', promise: fromBetterLyricsLegacy(track) });
-    if (providerSettings.musixmatch && !excludeKeys.has('musixmatch'))         jobDefs.push({ key: 'musixmatch', promise: fromMusixmatch(track) });
-    if (providerSettings.unison && !excludeKeys.has('unison'))             jobDefs.push({ key: 'unison', promise: fromUnison(track) });
-    if (providerSettings.binilyrics && !excludeKeys.has('binilyrics'))         jobDefs.push({ key: 'binilyrics', promise: fromBiniLyrics(track) });
+    const add = (key, fn) => {
+      if (providerSettings[key] && !excludeKeys.has(key)) jobDefs.push({ key, promise: fn(track) });
+    };
+    add('lrcred', fromLrcRed);
+    add('betterlyricsTTML', fromBetterLyricsTTML);
+    add('betterlyricsKugou', fromBetterLyricsKugou);
+    add('betterlyricsPortato', fromBetterLyricsPortato);
+    add('lrclib', fromLrclib);
+    add('betterlyricsLegacy', fromBetterLyricsLegacy);
+    add('musixmatch', fromMusixmatch);
+    add('unison', fromUnison);
+    add('binilyrics', fromBiniLyrics);
+
+    const spotifyOn = !!providerSettings.spotify && !excludeKeys.has('spotify');
+    let spotifyJob = null;
+    const getSpotify = () => spotifyJob || (spotifyJob = { key: 'spotify', promise: fromSpotify(track) });
 
     let best = null;
+    let orderedKeys = [];
     if (jobDefs.length) {
-      const orderedKeys = priorityEnabled
+      orderedKeys = priorityEnabled
         ? priorityOrder.filter((k) => PRIORITY_ELIGIBLE_KEYS.includes(k) && jobDefs.some((j) => j.key === k))
         : [];
       if (orderedKeys.length) {
         const priorityJobs = orderedKeys.map((k) => jobDefs.find((j) => j.key === k));
         best = await racePriorityProviders(priorityJobs, priorityWaitEnabled);
-        if (best && best.mode === 'plain') {
-          log('priority provider gave unsynced lyrics, checking all providers for up to', UNSYNCED_UPGRADE_MS, 'ms');
-          best = await upgradeUnsynced(best, jobDefs, orderedKeys);
-        }
         if (!best) {
-          // None of the prioritized providers had anything — fall back to
-          // whatever the rest of the enabled providers turn up, same
-          // best-of race as the no-priority path.
           const remainingJobs = jobDefs.filter((j) => !orderedKeys.includes(j.key));
           if (remainingJobs.length) {
             log('priority list empty-handed, falling back to other enabled providers');
@@ -1018,17 +1073,41 @@
       } else {
         best = await raceProviders(jobDefs.map((j) => j.promise), onUpdate);
       }
+
+      // Quality-first scan across every provider (and Spotify for plain).
+      if (best && MODE_RANK[best.mode] < MODE_RANK.word) {
+        const isPlain = best.mode === 'plain';
+        // Priority OFF already compared line results during its own window.
+        if (isPlain || orderedKeys.length) {
+          const scanJobs = jobDefs.slice();
+          if (isPlain && spotifyOn) scanJobs.push(getSpotify());
+          best = await upgradeResult(best, scanJobs, orderedKeys, isPlain ? UNSYNCED_UPGRADE_MS : LINE_UPGRADE_MS);
+        }
+      }
     }
 
-    // Spotify is tried last, only as a fallback when every other enabled
-    // provider came back empty — never raced in parallel with them.
-    if (!best && providerSettings.spotify && !excludeKeys.has('spotify')) {
-      log('no result from other providers, trying Spotify as fallback');
-      best = await fromSpotify(track);
+    // Nothing from any other provider: Spotify on its own.
+    if (!best && spotifyOn) {
+      log('no result from other providers, trying Spotify');
+      best = await getSpotify().promise;
     }
+    return best;
+  }
 
+  async function fetchBestLyrics(track, opts) {
+    const excludeKeys = new Set((opts && opts.excludeKeys) || []);
+    const onUpdate = opts && opts.onUpdate;
+    const key = cacheKeyFor(track, excludeKeys);
+    const cached = cacheGet(key);
+    if (cached) {
+      log('cache hit', cached.provider, cached.mode);
+      if (typeof onUpdate === 'function') onUpdate(cached);
+      return cached;
+    }
+    const best = await resolveLyrics(track, excludeKeys, onUpdate);
     if (!best) { log('all providers failed or disabled'); return null; }
-    log('resolved', track, best?.provider, best?.mode);
+    log('resolved', track, best.provider, best.mode);
+    cachePut(key, best);
     return best;
   }
 

@@ -19,27 +19,60 @@
     return;
   }
 
-  // Same shape as https://github.com/bharadwajpro/m3u8-player's player.js —
-  // confirmed working against this exact Apple CDN with zero special
-  // handling, so deliberately not adding any here.
-  if (window.Hls && window.Hls.isSupported()) {
-    var hls = new window.Hls();
-    hls.on(window.Hls.Events.MANIFEST_PARSED, function () {
-      video.play().catch(function () {});
-    });
-    hls.on(window.Hls.Events.ERROR, function (_evt, data) {
-      if (data && data.fatal) post('error', data.type + ':' + data.details);
-    });
-    hls.loadSource(url);
-    hls.attachMedia(video);
-  } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-    video.src = url;
-    video.addEventListener('canplay', function () { video.play().catch(function () {}); }, { once: true });
-  } else {
+  var hls = null;
+  var hlsStarted = false;
+  var playbackRequested = false;
+  var nativeHls = !(window.Hls && window.Hls.isSupported()) && video.canPlayType('application/vnd.apple.mpegurl');
+
+  function startPlayback() {
+    if (document.hidden || playbackRequested) return;
+    playbackRequested = true;
+    if (window.Hls && window.Hls.isSupported()) {
+      if (!hls) {
+        hls = new window.Hls({ enableWorker: true, maxBufferLength: 15 });
+        hls.on(window.Hls.Events.ERROR, function (_evt, data) {
+          if (data && data.fatal) post('error', data.type + ':' + data.details);
+        });
+        hls.attachMedia(video);
+      }
+      if (!hlsStarted) {
+        hlsStarted = true;
+        hls.loadSource(url);
+      } else {
+        hls.startLoad();
+      }
+    } else if (nativeHls) {
+      if (!video.src) video.src = url;
+    } else {
+      playbackRequested = false;
+      post('error', 'hls-unsupported');
+      return;
+    }
+    video.play().catch(function () { playbackRequested = false; });
+  }
+
+  function pausePlayback() {
+    playbackRequested = false;
+    video.pause();
+    if (hls) hls.stopLoad();
+  }
+
+  window.addEventListener('message', function (event) {
+    if (event.source !== window.parent) return;
+    if (event.data && event.data.__viviAppleCanvasControl === 'pause') pausePlayback();
+    else if (event.data && event.data.__viviAppleCanvasControl === 'resume') startPlayback();
+  });
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) pausePlayback();
+    else startPlayback();
+  });
+
+  if (!(window.Hls && window.Hls.isSupported()) && !nativeHls) {
     post('error', 'hls-unsupported');
     return;
   }
 
   video.addEventListener('error', function () { post('error', 'video-element-error'); });
   video.addEventListener('playing', function () { post('playing'); }, { once: true });
+  startPlayback();
 })();

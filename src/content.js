@@ -265,6 +265,7 @@
   // preserves the original always-try-Spotify-first behavior; 'apple' flips it.
   let canvasPriority = 'apple';
   let currentSpotifyCanvasUrl = null;
+  let deferredCanvasTrack = null;
   let spotifyCanvasRequestKey = null;
 
   
@@ -1279,7 +1280,8 @@
       }
 
       const vid = document.createElement('video');
-      attachVideoSource(vid, videoUrl);
+      if (document.hidden) vid.dataset.viviDeferredSrc = videoUrl;
+      else attachVideoSource(vid, videoUrl);
       vid.autoplay = true;
       vid.loop = true;
       vid.muted = true;
@@ -1304,7 +1306,10 @@
           updateCanvasShapeClass(vid.videoWidth, vid.videoHeight);
         }, { once: true });
       }
-      vid.addEventListener('canplay', () => { vid.play().catch(() => {}); }, { once: true });
+      vid.addEventListener('canplay', () => {
+        if (document.hidden) { vid.dataset.viviPausedForBackground = '1'; return; }
+        vid.play().catch(() => {});
+      }, { once: true });
       vid.addEventListener('error', () => {
         // Some Apple artwork URLs can expire or momentarily fail after playing.
         // Replace the media *in place* and preserve its overlay identity so the
@@ -1853,7 +1858,7 @@
 
   function injectAppleArtwork({ videoUrl, imageUrl }, attempt = 0, token = canvasRenderToken, trackKey = currentTrackKey) {
     if (token !== canvasRenderToken || trackKey !== currentTrackKey) return;
-    if (!appleCanvasEnabled || !isMainPlayerPageActive()) return;
+    if (!appleCanvasEnabled || document.hidden || !isMainPlayerPageActive()) return;
     if (isRealMusicVideo()) return;
 
     setBackgroundVar(imageUrl);
@@ -2087,8 +2092,266 @@
   // *effective* on/off state without losing what the person picked in settings.
   let kawarpUserEnabled = false; // off by default; the popup turns it on
   let eqUserEnabled = false;
+  let discStyleEnabled = false;
+  let discArtworkResizeObserver = null;
+  let discObservedArtwork = null;
+  let discArmPlacementTimer = null;
+  let playerTabIconsEnabled = true;
+  let playerTabIconsObserver = null;
+  let playerTabIconsContainer = null;
+
+  const PLAYER_TAB_ICON_PATHS = {
+    next: [
+      'M4 6h2M9 6h11M4 12h2M9 12h11M4 18h2M9 18h11',
+    ],
+    lyrics: [
+      'M7 3.5h7l4 4v13H7z',
+      'M14 3.5v4h4M10 12h5M10 15.5h5',
+    ],
+    comments: [
+      'M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l1.6-3A7.5 7.5 0 1 1 20 11.5Z',
+      'M9 11.5h.01M12.5 11.5h.01M16 11.5h.01',
+    ],
+    related: [
+      'M5 4.5h10v12H5zM9 8.5h10v12H9z',
+      'M12 11.5h4M12 14.5h4',
+    ],
+  };
+
+  function playerTabIconKind(tab) {
+    const label = `${tab.getAttribute('aria-label') || ''} ${tab.querySelector('.tab-content')?.textContent || ''}`
+      .toLowerCase().replace(/\s+/g, ' ').trim();
+    if (label.includes('up next') || label.includes('queue')) return 'next';
+    if (label.includes('lyric')) return 'lyrics';
+    if (label.includes('comment')) return 'comments';
+    if (label.includes('related')) return 'related';
+    return null;
+  }
+
+  function createPlayerTabIcon(kind) {
+    const wrapper = document.createElement('span');
+    wrapper.className = 'vivi-player-tab-icon';
+    wrapper.dataset.iconKind = kind;
+    wrapper.setAttribute('aria-hidden', 'true');
+    if (kind === 'lyrics') {
+      const maskUrl = chrome.runtime.getURL('icons/apple-music-lyrics.png');
+      wrapper.classList.add('vivi-player-tab-icon-image');
+      wrapper.style.webkitMaskImage = `url("${maskUrl}")`;
+      wrapper.style.maskImage = `url("${maskUrl}")`;
+      return wrapper;
+    }
+
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-width', '1.8');
+    svg.setAttribute('stroke-linecap', 'round');
+    svg.setAttribute('stroke-linejoin', 'round');
+    PLAYER_TAB_ICON_PATHS[kind].forEach((d) => {
+      const path = document.createElementNS(ns, 'path');
+      path.setAttribute('d', d);
+      svg.appendChild(path);
+    });
+    wrapper.appendChild(svg);
+    return wrapper;
+  }
+
+  function decoratePlayerTabIcons() {
+    const container = document.querySelector('ytmusic-player-page #tabsContainer');
+    if (container !== playerTabIconsContainer) {
+      playerTabIconsObserver?.disconnect();
+      playerTabIconsObserver = null;
+      playerTabIconsContainer = container;
+      if (container && playerTabIconsEnabled) {
+        playerTabIconsObserver = new MutationObserver(() => decoratePlayerTabIcons());
+        playerTabIconsObserver.observe(container, { childList: true, subtree: true });
+      }
+    }
+    if (!container || !playerTabIconsEnabled) return;
+    container.querySelectorAll('tp-yt-paper-tab.ytmusic-player-page').forEach((tab) => {
+      const tabContent = tab.querySelector('.tab-content');
+      const kind = playerTabIconKind(tab);
+      if (!tabContent || !kind || tab.dataset.viviPlayerTabIcon === kind) return;
+      tab.querySelector('.vivi-player-tab-icon')?.remove();
+      tabContent.appendChild(createPlayerTabIcon(kind));
+      tab.dataset.viviPlayerTabIcon = kind;
+    });
+  }
+
+  function applyPlayerTabIcons(enabled) {
+    playerTabIconsEnabled = enabled !== false;
+    document.documentElement.classList.toggle('vivi-player-tab-icons', playerTabIconsEnabled);
+    if (playerTabIconsEnabled) {
+      decoratePlayerTabIcons();
+      return;
+    }
+    playerTabIconsObserver?.disconnect();
+    playerTabIconsObserver = null;
+    playerTabIconsContainer = null;
+    document.querySelectorAll('.vivi-player-tab-icon').forEach((icon) => icon.remove());
+    document.querySelectorAll('[data-vivi-player-tab-icon]').forEach((tab) => delete tab.dataset.viviPlayerTabIcon);
+  }
+
+  const DISC_BACKING_STYLE_PROPERTIES = [
+    'background', 'background-image', 'box-shadow', 'border', 'border-radius', 'outline'
+  ];
+
+  function clearDiscBacking(artwork) {
+    if (!artwork) return;
+    const mediaWindow = artwork.closest('#song-media-window');
+    let node = artwork;
+    let hops = 0;
+    while (node && hops++ < 6) {
+      if (!node.dataset.viviDiscOriginalStyles) {
+        const original = {};
+        DISC_BACKING_STYLE_PROPERTIES.forEach((property) => {
+          original[property] = {
+            value: node.style.getPropertyValue(property),
+            priority: node.style.getPropertyPriority(property),
+          };
+        });
+        node.dataset.viviDiscOriginalStyles = JSON.stringify(original);
+      }
+      node.style.setProperty('background', 'transparent', 'important');
+      node.style.setProperty('background-image', 'none', 'important');
+      node.style.setProperty('box-shadow', 'none', 'important');
+      node.style.setProperty('border', '0', 'important');
+      node.style.setProperty('outline', 'none', 'important');
+      if (node !== artwork) node.style.setProperty('border-radius', '0', 'important');
+      if (node === mediaWindow || node === document.querySelector('ytmusic-player')) break;
+      node = node.parentElement;
+    }
+  }
+
+  function restoreDiscBacking() {
+    document.querySelectorAll('[data-vivi-disc-original-styles]').forEach((node) => {
+      let original = {};
+      try { original = JSON.parse(node.dataset.viviDiscOriginalStyles || '{}'); } catch (_) {}
+      DISC_BACKING_STYLE_PROPERTIES.forEach((property) => {
+        const saved = original[property];
+        if (saved?.value) node.style.setProperty(property, saved.value, saved.priority || '');
+        else node.style.removeProperty(property);
+      });
+      delete node.dataset.viviDiscOriginalStyles;
+    });
+  }
+
+  function cancelDiscArmPlacement() {
+    if (discArmPlacementTimer) clearTimeout(discArmPlacementTimer);
+    discArmPlacementTimer = null;
+    document.documentElement.classList.remove('vivi-disc-arm-ready');
+  }
+
+  function scheduleDiscArmPlacement(artwork, arm, bounds) {
+    const target = {
+      left: bounds.left + bounds.width * 0.04,
+      top: bounds.top + bounds.height * 0.91,
+      width: bounds.width * 0.49,
+    };
+    const placed = {
+      left: parseFloat(arm.style.left) || 0,
+      top: parseFloat(arm.style.top) || 0,
+      width: parseFloat(arm.style.width) || 0,
+    };
+    if (document.documentElement.classList.contains('vivi-disc-arm-ready') &&
+        Math.abs(placed.left - target.left) < 2 &&
+        Math.abs(placed.top - target.top) < 2 &&
+        Math.abs(placed.width - target.width) < 2) return;
+
+    if (discArmPlacementTimer) clearTimeout(discArmPlacementTimer);
+    document.documentElement.classList.remove('vivi-disc-arm-ready');
+    discArmPlacementTimer = setTimeout(() => {
+      discArmPlacementTimer = null;
+      const latestArtwork = document.querySelector('ytmusic-player #song-image');
+      const latestBounds = latestArtwork?.getBoundingClientRect();
+      if (!discStyleEnabled || latestArtwork !== artwork || document.hidden ||
+          !isMainPlayerPageActive() || !latestBounds || latestBounds.width < 260 || latestBounds.height < 260) {
+        syncDiscTonearm();
+        return;
+      }
+
+      const latest = {
+        left: latestBounds.left + latestBounds.width * 0.04,
+        top: latestBounds.top + latestBounds.height * 0.91,
+        width: latestBounds.width * 0.49,
+      };
+      if (Math.abs(latest.left - target.left) > 2 ||
+          Math.abs(latest.top - target.top) > 2 ||
+          Math.abs(latest.width - target.width) > 2) {
+        scheduleDiscArmPlacement(artwork, arm, latestBounds);
+        return;
+      }
+
+      arm.style.left = `${latest.left}px`;
+      arm.style.top = `${latest.top}px`;
+      arm.style.width = `${latest.width}px`;
+      arm.style.right = 'auto';
+      arm.style.bottom = 'auto';
+      document.documentElement.classList.add('vivi-disc-arm-ready');
+    }, 220);
+  }
+
+  function syncDiscTonearm() {
+    const artwork = document.querySelector('ytmusic-player #song-image');
+    const bounds = artwork?.getBoundingClientRect();
+    const fullPlayer = !!bounds && bounds.width >= 260 && bounds.height >= 260 &&
+      !document.hidden && isMainPlayerPageActive();
+    document.documentElement.classList.toggle(
+      'vivi-disc-full-player',
+      discStyleEnabled && fullPlayer
+    );
+    if (discObservedArtwork !== artwork) {
+      discArtworkResizeObserver?.disconnect();
+      discArtworkResizeObserver = null;
+      discObservedArtwork = artwork;
+      if (artwork && discStyleEnabled && typeof ResizeObserver === 'function') {
+        discArtworkResizeObserver = new ResizeObserver(() => syncDiscTonearm());
+        discArtworkResizeObserver.observe(artwork);
+      }
+    }
+    if (discStyleEnabled && artwork && fullPlayer) clearDiscBacking(artwork);
+    else restoreDiscBacking();
+
+    let arm = document.querySelector('.vivi-disc-tonearm');
+    if (!discStyleEnabled || !artwork || !fullPlayer) {
+      cancelDiscArmPlacement();
+      arm?.remove();
+      return;
+    }
+    if (!arm) {
+      arm = document.createElement('span');
+      arm.className = 'vivi-disc-tonearm';
+      arm.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(arm);
+    }
+    scheduleDiscArmPlacement(artwork, arm, bounds);
+  }
+
+  function updateDiscPlaybackState() {
+    const video = getVideoEl();
+    const playing = !!video && !video.paused && !video.ended;
+    document.documentElement.classList.toggle('vivi-disc-playing', playing);
+    syncDiscTonearm();
+  }
+
+  function applyDiscStyle(enabled) {
+    discStyleEnabled = enabled === true;
+    document.documentElement.classList.toggle('vivi-disc-style', discStyleEnabled);
+    if (!discStyleEnabled) {
+      discArtworkResizeObserver?.disconnect();
+      discArtworkResizeObserver = null;
+      discObservedArtwork = null;
+      cancelDiscArmPlacement();
+      document.querySelectorAll('.vivi-disc-tonearm').forEach((arm) => arm.remove());
+      restoreDiscBacking();
+    }
+    updateDiscPlaybackState();
+  }
+
   function updateKawarpVisibility() {
-    const active = isMainPlayerPageActive();
+    const active = isMainPlayerPageActive() && !document.hidden;
     window.__viviKawarp?.setEnabled(kawarpUserEnabled && !resourceSaver && active);
     // Reuses the same detection this function already does for Kawarp
     // (including the immediate MutationObserver added above) so the EQ
@@ -2096,6 +2359,46 @@
     // instead of staying visible over Home/Explore/etc.
     window.__viviEqualizer?.setAllowed(eqUserEnabled && !resourceSaver);
     window.__viviEqualizer?.setVisible(eqUserEnabled && !resourceSaver && active);
+  }
+
+  function updateBackgroundTabMode() {
+    const hidden = document.hidden;
+    document.documentElement.classList.toggle('vivi-background-tab', hidden);
+    document.querySelectorAll('.vivi-canvas-media, .vivi-canvas-player-media, .vivi-lyrics-dancer').forEach((media) => {
+      if (media.tagName === 'IFRAME') {
+        try { media.contentWindow?.postMessage({ __viviAppleCanvasControl: hidden ? 'pause' : 'resume' }, '*'); } catch (_) {}
+        return;
+      }
+      if (hidden) {
+        if (media.dataset.viviDeferredSrc) return;
+        if (!media.paused) media.dataset.viviPausedForBackground = '1';
+        try { media.pause?.(); } catch (_) {}
+      } else {
+        const deferredSrc = media.dataset.viviDeferredSrc;
+        if (deferredSrc) {
+          delete media.dataset.viviDeferredSrc;
+          attachVideoSource(media, deferredSrc);
+        } else if (media.dataset.viviPausedForBackground === '1') {
+          delete media.dataset.viviPausedForBackground;
+          media.play?.().catch(() => {});
+        }
+      }
+    });
+    updateDiscPlaybackState();
+    updateKawarpVisibility();
+    if (!hidden && deferredCanvasTrack && !discStyleEnabled) {
+      const track = deferredCanvasTrack;
+      deferredCanvasTrack = null;
+      currentTrackKey = null;
+      handleTrackChange(track);
+    } else if (!hidden && !discStyleEnabled) {
+      if (currentSpotifyCanvasUrl && !document.querySelector('.vivi-canvas-player-media')) {
+        injectSpotifyCanvas(currentSpotifyCanvasUrl, 0, canvasRenderToken, currentTrackKey);
+      } else if (appleCanvasEnabled && currentVideoUrl && !document.querySelector('.vivi-canvas-media[data-vivi-apple-overlay="1"]')) {
+        injectAppleArtwork({ videoUrl: currentVideoUrl, imageUrl: currentImageUrl }, 0, canvasRenderToken, currentTrackKey);
+      }
+    }
+    syncMainCanvasToRoute();
   }
 
   // Delay Canvas reveal by ~1s specifically when reopening the full player
@@ -2163,6 +2466,8 @@
   }
 
   function syncMainCanvasToRoute() {
+    syncDiscTonearm();
+    if (playerTabIconsEnabled) decoratePlayerTabIcons();
     syncPlayerClosedFlag();
     const player = document.querySelector(`.${MAIN_PLAYER_CLASS}`);
     const active = isMainPlayerPageActive();
@@ -2240,6 +2545,7 @@
 
   function injectSpotifyCanvas(url, attempt = 0, token = canvasRenderToken, trackKey = currentTrackKey) {
     if (!url || imageOnlyMode) return;
+    if (document.hidden) return;
     if (token !== canvasRenderToken || trackKey !== currentTrackKey) return;
     if (isRealMusicVideo()) return;
     if (!isMainPlayerPageActive()) {
@@ -2406,6 +2712,14 @@
 
     clearTimeout(retryTimer);
 
+    // Track metadata and the lightweight Last.fm/lyrics paths still update in
+    // the background, but defer Canvas lookup and media creation until the
+    // user returns to this tab.
+    if (document.hidden) {
+      deferredCanvasTrack = track;
+      return;
+    }
+
     // Never overlay Canvas/animated-artwork on top of an actual music video —
     // only plain songs (art-track playback) should ever get one. Still update
     // the blurred page background from the video's own thumbnail (grabbed
@@ -2540,6 +2854,7 @@
     if (attempt >= RETRY_DELAYS.length) return; // give up after the last backoff step
     retryTimer = setTimeout(async () => {
       if (currentTrackKey !== key) return; // track moved on, this retry is stale
+      if (document.hidden) { deferredCanvasTrack = track; return; }
       if (!appleCanvasEnabled || currentSpotifyCanvasUrl) return; // source turned off / Spotify Canvas took over meanwhile
       const retry = await ensureAppleCached(track, key);
       if (currentTrackKey !== key) return;
@@ -2740,7 +3055,9 @@
     }
 
     // Route changes can occur through internal Polymer state without a history event.
-    setInterval(() => syncMainCanvasToRoute(), 350);
+    // History and player-state events handle normal SPA navigation. Keep a slower
+    // safety poll for YTM's internal route changes that emit neither event.
+    setInterval(() => syncMainCanvasToRoute(), 1500);
   }
 
   // Minimizing the full player (clicking the collapse chevron) doesn't change
@@ -2780,6 +3097,7 @@
       playerStateCheckScheduled = false;
       syncMainCanvasToRoute();
       nudgeNativePlayerRelayout();
+      syncDiscTonearm();
     });
   }
 
@@ -2797,6 +3115,14 @@
   installRouteWatcher();
   bindPlayerStateObserver();
   primeMemCacheFromStorage();
+  document.addEventListener('visibilitychange', updateBackgroundTabMode);
+  document.addEventListener('play', updateDiscPlaybackState, true);
+  document.addEventListener('playing', updateDiscPlaybackState, true);
+  document.addEventListener('pause', updateDiscPlaybackState, true);
+  document.addEventListener('ended', updateDiscPlaybackState, true);
+  window.addEventListener('resize', syncDiscTonearm, { passive: true });
+  window.addEventListener('scroll', syncDiscTonearm, { passive: true, capture: true });
+  updateBackgroundTabMode();
 
   chrome.storage.local.get(LASTFM_DEFAULTS, (stored) => {
     lastfmSettings = { ...LASTFM_DEFAULTS, ...stored };
@@ -2806,18 +3132,24 @@
 
   chrome.storage.local.get({
     enabled: true, themeEnabled: true, imageOnlyMode: false, spotifyCanvasEnabled: true, canvasPriority: 'apple', sponsorBlockEnabled: true,
+    discStyleEnabled: false,
+    playerTabIcons: true,
     kawarpEnabled: false, kawarpPauseWhenInactive: true, eqEnabled: false, resourceSaverEnabled: false,
     kawarpWarpIntensity: 1.0, kawarpBlurPasses: 6, kawarpAnimationSpeed: 4.15,
     kawarpTransitionDuration: 0, kawarpSaturation: 2.6, kawarpDithering: 0.034, kawarpOpacity: 1.0, kawarpBrightness: 0.5,
   }, ({
     enabled, themeEnabled, imageOnlyMode: imgOnly, spotifyCanvasEnabled: spCanvas, canvasPriority: canvasPrio, sponsorBlockEnabled: sbEnabled,
+    discStyleEnabled: discStyle,
+    playerTabIcons: tabIcons,
     kawarpEnabled: kwEnabled, kawarpPauseWhenInactive: kwPause, eqEnabled: eqEnabled_, resourceSaverEnabled: rsEnabled,
     kawarpWarpIntensity, kawarpBlurPasses, kawarpAnimationSpeed, kawarpTransitionDuration, kawarpSaturation, kawarpDithering, kawarpOpacity, kawarpBrightness,
   }) => {
     bindCanvasTrackTransitionGuard();
     resourceSaver = rsEnabled === true;
-    appleUserEnabled = enabled !== false;
-    spotifyCanvasEnabled = spCanvas !== false;
+    appleUserEnabled = enabled !== false && discStyle !== true;
+    spotifyCanvasEnabled = spCanvas !== false && discStyle !== true;
+    applyDiscStyle(discStyle);
+    applyPlayerTabIcons(tabIcons);
     canvasPriority = canvasPrio === 'apple' ? 'apple' : 'spotify';
     sponsorUserEnabled = sbEnabled !== false;
     themeUserEnabled = themeEnabled;
@@ -3113,16 +3445,27 @@
       // rather than waiting up to POLL_INTERVAL for the next safety-net tick.
       let reCheckCanvas = false;
       if ('enabled' in msg) {
-        appleUserEnabled = msg.enabled !== false;
+        appleUserEnabled = msg.enabled !== false && !discStyleEnabled;
         appleCanvasEnabled = appleUserEnabled && !resourceSaver;
         reCheckCanvas = true;
+      }
+      if ('discStyleEnabled' in msg) {
+        applyDiscStyle(msg.discStyleEnabled);
+        if (discStyleEnabled) {
+          deferredCanvasTrack = null;
+          appleUserEnabled = false;
+          appleCanvasEnabled = false;
+          spotifyCanvasEnabled = false;
+          reCheckCanvas = true;
+        }
       }
       if ('themeEnabled' in msg) {
         themeUserEnabled = msg.themeEnabled;
         applyTheme(msg.themeEnabled);
       }
+      if ('playerTabIcons' in msg) applyPlayerTabIcons(msg.playerTabIcons);
       if ('spotifyCanvasEnabled' in msg) {
-        spotifyCanvasEnabled = msg.spotifyCanvasEnabled !== false;
+        spotifyCanvasEnabled = msg.spotifyCanvasEnabled !== false && !discStyleEnabled;
         reCheckCanvas = true;
       }
       if ('canvasPriority' in msg) {

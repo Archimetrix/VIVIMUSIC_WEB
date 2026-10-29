@@ -334,7 +334,7 @@
 
   function ensureInfoButton() {
     const tab = findTabByLabel('lyrics');
-    const canShowOffset = settings.lyricsEnabled && !!(currentResult && currentResult.mode !== 'plain');
+    const canShowOffset = settings.lyricsEnabled && !!(currentResult && !currentResult.videoBlocked && currentResult.provider);
 
     if (!tab || !canShowOffset) {
       removeInfoButton();
@@ -353,9 +353,9 @@
       btn.type = 'button';
       btn.className = 'vivi-lyrics-info-btn';
       btn.textContent = 'i';
-      btn.setAttribute('aria-label', 'Adjust lyrics sync offset');
+      btn.setAttribute('aria-label', 'Lyrics provider & sync options');
       btn.setAttribute('aria-expanded', 'false');
-      btn.title = 'Adjust lyrics sync';
+      btn.title = 'Lyrics provider & sync';
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         e.preventDefault();
@@ -597,6 +597,7 @@
     }
 
     ensureInfoButton();
+    requestLyricsTick();
   }
 
   function scheduleSync() {
@@ -679,7 +680,8 @@
       refetchFromOtherProviders();
     });
 
-    controls.append(minus, input, unit, plus, saveBtn, refetchBtn);
+    if (result.mode === 'plain') controls.append(refetchBtn);
+    else controls.append(minus, input, unit, plus, saveBtn, refetchBtn);
     wrap.appendChild(controls);
     return wrap;
   }
@@ -974,7 +976,7 @@
 
     const frag = document.createDocumentFragment();
 
-    if (offsetPanelOpen && result.mode !== 'plain' && result.provider) {
+    if (offsetPanelOpen && result.provider) {
       frag.appendChild(buildOffsetPanel(result));
     }
 
@@ -1057,9 +1059,20 @@
     return null;
   }
 
+  function shouldRunLyricsTick() {
+    if (!settings.lyricsEnabled || !currentResult || currentResult.videoBlocked || currentResult.mode === 'plain') return false;
+    if (document.visibilityState === 'hidden' || !isLyricsTabActive() || !document.getElementById(PANEL_ID)) return false;
+    const video = getVideoEl();
+    return !!video && !video.paused && !video.ended;
+  }
+
+  function requestLyricsTick() {
+    if (rafId === null && shouldRunLyricsTick()) rafId = requestAnimationFrame(tick);
+  }
+
   function tick() {
-    rafId = requestAnimationFrame(tick);
-    if (!currentResult || currentResult.videoBlocked || currentResult.mode === 'plain') return;
+    rafId = null;
+    if (!shouldRunLyricsTick()) return;
     const video = getVideoEl();
     if (!video) return;
     // Shift the raw video position back by whatever SponsorBlock already
@@ -1193,6 +1206,9 @@
         });
       }
     }
+    // Keep per-frame timing only while word/syllable lyrics are visible and the
+    // media is playing. Idle pages and paused audio do no animation work.
+    requestLyricsTick();
   }
 
   function getCurrentVideoId() {
@@ -1279,7 +1295,7 @@
     isLoadingLyrics = false;
     currentResult = result;
     contentDirty = true;
-    offsetPanelOpen = keepOffsetPanelOpen && !!result && result.mode !== 'plain';
+    offsetPanelOpen = keepOffsetPanelOpen && !!result;
     // Render immediately — don't gate the panel/offset button on the
     // chrome.storage round-trip below. fetchBestLyrics() can resolve
     // before YT Music has finished (re)mounting its own tab strip.
@@ -1347,7 +1363,10 @@
   }, true);
 
   watchTabHost();
-  tick();
+  document.addEventListener('play', requestLyricsTick, true);
+  document.addEventListener('playing', requestLyricsTick, true);
+  document.addEventListener('timeupdate', requestLyricsTick, true);
+  document.addEventListener('visibilitychange', requestLyricsTick);
 
   window.__viviLyricsUI = { handleTrack, setSponsorOffset };
 })();

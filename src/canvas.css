@@ -925,6 +925,239 @@ html.vivi-canvas-large ytmusic-player-bar .image.ytmusic-player-bar {
   transition: none !important;
 }
 
+/* Stop extension-only visual work while this YouTube Music tab is in the
+   background. The media elements are also paused from content.js so decoders
+   and HLS fetching can stop, then resume when the tab becomes visible. */
+html.vivi-background-tab .vivi-canvas-media,
+html.vivi-background-tab .vivi-canvas-player-media,
+html.vivi-background-tab .vivi-canvas-crossfade,
+html.vivi-background-tab .vivi-canvas-fadeout,
+html.vivi-background-tab .vivi-canvas-player-crossfade,
+html.vivi-background-tab .vivi-canvas-player-fadeout,
+html.vivi-background-tab #vivi-lyrics-panel *,
+html.vivi-background-tab .vivi-disc-tonearm,
+html.vivi-background-tab ytmusic-player #song-image img,
+html.vivi-background-tab ytmusic-player #song-image::before,
+html.vivi-background-tab ytmusic-player-bar .thumbnail-image-wrapper img,
+html.vivi-background-tab ytmusic-player-bar ytmusic-thumbnail img,
+html.vivi-background-tab ytmusic-player-bar .image img {
+  animation-play-state: paused !important;
+  transition: none !important;
+}
+
+html.vivi-background-tab #vivi-bg-layer { display: none !important; }
+
+/* Optional icon-only labels for YouTube Music's full-player tabs. The original
+   label text stays in the DOM for accessibility; only its visual text is hidden. */
+html.vivi-player-tab-icons ytmusic-player-page #tabsContainer tp-yt-paper-tab.ytmusic-player-page .tab-content {
+  color: transparent !important;
+  font-size: 0 !important;
+}
+
+html.vivi-player-tab-icons .vivi-player-tab-icon {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-primary, #fff);
+  opacity: .72;
+  transition: color 180ms ease, opacity 180ms ease, transform 180ms ease, filter 180ms ease;
+}
+
+html.vivi-player-tab-icons .vivi-player-tab-icon svg {
+  display: block;
+  width: 26px;
+  height: 26px;
+}
+
+html.vivi-player-tab-icons .vivi-player-tab-icon-image {
+  background-color: currentColor;
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  -webkit-mask-size: contain;
+}
+
+html.vivi-player-tab-icons ytmusic-player-page #tabsContainer tp-yt-paper-tab.iron-selected .vivi-player-tab-icon,
+html.vivi-player-tab-icons ytmusic-player-page #tabsContainer tp-yt-paper-tab[aria-selected="true"] .vivi-player-tab-icon {
+  color: var(--accent, #c88cff);
+  opacity: 1;
+  transform: scale(1.1);
+  filter: drop-shadow(0 0 5px var(--accent, #c88cff));
+}
+
+html.vivi-player-tab-icons ytmusic-player-page #tabsContainer tp-yt-paper-tab.iron-selected .vivi-player-tab-icon svg,
+html.vivi-player-tab-icons ytmusic-player-page #tabsContainer tp-yt-paper-tab[aria-selected="true"] .vivi-player-tab-icon svg {
+  stroke-width: 2.2;
+}
+
+/* Vinyl artwork is opt-in and uses YouTube Music's existing full-player
+   thumbnail. Its square image is retained and clipped to a circle, so only
+   the natural corner pixels are omitted. */
+html.vivi-disc-style.vivi-disc-full-player ytmusic-player #song-media-window {
+  position: relative !important;
+  overflow: visible !important;
+  background: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+html.vivi-disc-style.vivi-disc-full-player ytmusic-player .player-minimize-button {
+  display: none !important;
+}
+
+html.vivi-disc-style.vivi-disc-full-player ytmusic-player #song-media-window::before,
+html.vivi-disc-style.vivi-disc-full-player ytmusic-player #song-media-window::after {
+  content: none !important;
+  display: none !important;
+  background: none !important;
+  box-shadow: none !important;
+}
+
+html.vivi-disc-style.vivi-disc-full-player ytmusic-player #song-image {
+  position: relative !important;
+  overflow: hidden !important;
+  clip-path: circle(50% at 50% 50%) !important;
+  isolation: isolate;
+  background: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+html.vivi-disc-style.vivi-disc-full-player ytmusic-player #song-image > *,
+html.vivi-disc-style.vivi-disc-full-player ytmusic-player #song-image ytmusic-thumbnail,
+html.vivi-disc-style.vivi-disc-full-player ytmusic-player #song-image .image {
+  background: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  clip-path: circle(50% at 50% 50%) !important;
+}
+
+html.vivi-disc-style.vivi-disc-full-player ytmusic-player .ytmusic-player-thumbnail,
+html.vivi-disc-style.vivi-disc-full-player ytmusic-player ytmusic-thumbnail.ytmusic-player {
+  background: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  border-radius: 50% !important;
+  box-shadow: none !important;
+  clip-path: circle(50% at 50% 50%) !important;
+}
+
+html.vivi-disc-style.vivi-disc-full-player ytmusic-player #song-image > img,
+html.vivi-disc-style.vivi-disc-full-player ytmusic-player #song-image img {
+  position: relative !important;
+  display: block !important;
+  width: 96% !important;
+  height: 96% !important;
+  margin: 2% !important;
+  border-radius: 50% !important;
+  object-fit: cover !important;
+  z-index: 1 !important;
+  animation: vivi-vinyl-spin 16s linear infinite;
+  animation-play-state: paused;
+}
+
+html.vivi-disc-style.vivi-disc-full-player.vivi-disc-playing ytmusic-player #song-image img {
+  animation-play-state: running;
+}
+
+html.vivi-disc-style.vivi-disc-full-player ytmusic-player #song-image::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle, transparent 0 48%, rgba(255,255,255,.18) 48.3% 48.7%, transparent 49% 66%, rgba(255,255,255,.12) 66.3% 66.7%, transparent 67% 82%, rgba(255,255,255,.16) 82.3% 82.7%, transparent 83%);
+  pointer-events: none;
+  z-index: 4;
+  animation: vivi-vinyl-spin 16s linear infinite;
+  animation-play-state: paused;
+}
+
+html.vivi-disc-style.vivi-disc-full-player ytmusic-player #song-image::after {
+  content: "";
+  position: absolute;
+  left: 46%;
+  top: 46%;
+  width: 8%;
+  height: 8%;
+  border-radius: 50%;
+  background: radial-gradient(circle, #17171c 0 24%, #c2c4cc 27% 38%, #262730 42% 100%);
+  box-shadow: 0 0 0 1px rgba(255,255,255,.28);
+  pointer-events: none;
+  z-index: 6;
+}
+
+html.vivi-disc-style.vivi-disc-full-player.vivi-disc-playing ytmusic-player #song-image::before {
+  animation-play-state: running;
+}
+
+.vivi-disc-tonearm {
+  display: none;
+  position: fixed;
+  width: 49%;
+  height: 7px;
+  top: 7%;
+  right: -1%;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #f4f5f8 0%, #888b95 42%, #343640 100%);
+  box-shadow: 0 1px 5px rgba(0,0,0,.6);
+  opacity: 0;
+  visibility: hidden;
+  transform: rotate(20deg);
+  transform-origin: left center;
+  transition: transform 700ms cubic-bezier(.2,.75,.25,1), opacity 160ms ease;
+  pointer-events: none;
+  z-index: 2147483001;
+}
+
+html.vivi-disc-style.vivi-disc-full-player .vivi-disc-tonearm { display: block; }
+html.vivi-disc-arm-ready .vivi-disc-tonearm {
+  opacity: 1;
+  visibility: visible;
+}
+
+.vivi-disc-tonearm::before {
+  content: "";
+  position: absolute;
+  left: -5px;
+  top: -3px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff, #777a84 58%, #272932 75%);
+  box-shadow: 0 0 0 1px rgba(0,0,0,.65);
+}
+
+.vivi-disc-tonearm::after {
+  content: "";
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 9px;
+  height: 3px;
+  border-radius: 2px;
+  background: #d9dbe2;
+}
+
+html.vivi-disc-style.vivi-disc-full-player.vivi-disc-playing .vivi-disc-tonearm {
+  transform: rotate(-43deg);
+}
+
+/* Vinyl styling is limited to the full-player artwork. Home shelves and the
+   compact player retain YouTube Music's original thumbnail shape. */
+
+@keyframes vivi-vinyl-spin { to { transform: rotate(360deg); } }
+
 /* ── Custom logo sizing ──
    The stock YT Music logo is an SVG rendered at a fixed 24px height; our
    replacement is a raster PNG with a different intrinsic aspect ratio, so

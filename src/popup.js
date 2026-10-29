@@ -15,6 +15,8 @@
   const kwTransitionDuration = document.getElementById('kwTransitionDuration');
   const kwPauseWhenInactive = document.getElementById('kwPauseWhenInactive');
   const themeToggle  = document.getElementById('themeToggle');
+  const discStyleToggle = document.getElementById('discStyleToggle');
+  const playerTabIconsToggle = document.getElementById('playerTabIconsToggle');
   const lyricsToggle = document.getElementById('lyricsToggle');
   const autoSwitchToggle = document.getElementById('autoSwitchToggle');
   const videoLyricsToggle = document.getElementById('videoLyricsToggle');
@@ -441,6 +443,64 @@
     const themeEnabled = themeToggle.checked;
     chrome.storage.local.set({ themeEnabled });
     relay({ themeEnabled });
+  });
+
+  chrome.storage.local.get({ playerTabIcons: true }, ({ playerTabIcons }) => {
+    playerTabIconsToggle.checked = playerTabIcons !== false;
+  });
+
+  playerTabIconsToggle.addEventListener('change', () => {
+    const playerTabIcons = playerTabIconsToggle.checked;
+    chrome.storage.local.set({ playerTabIcons });
+    relay({ playerTabIcons });
+  });
+
+  function setDiscStyleControlLock(enabled) {
+    ['enableToggle', 'spotifyCanvasEnabled'].forEach((id) => {
+      const control = document.getElementById(id);
+      if (!control) return;
+      control.disabled = enabled;
+      control.title = enabled ? 'Disabled while Vinyl disc artwork is on' : '';
+    });
+  }
+
+  chrome.storage.local.get({ discStyleEnabled: false }, ({ discStyleEnabled }) => {
+    discStyleToggle.checked = discStyleEnabled === true;
+    setDiscStyleControlLock(discStyleEnabled === true);
+  });
+
+  discStyleToggle.addEventListener('change', () => {
+    const discStyleEnabled = discStyleToggle.checked;
+    chrome.storage.local.get({ enabled: true, spotifyCanvasEnabled: true, discArtworkPrevious: null }, (current) => {
+      if (discStyleEnabled) {
+        const previous = current.discArtworkPrevious || {
+          enabled: current.enabled !== false,
+          spotifyCanvasEnabled: current.spotifyCanvasEnabled !== false,
+        };
+        chrome.storage.local.set({
+          discStyleEnabled: true,
+          discArtworkPrevious: previous,
+          enabled: false,
+          spotifyCanvasEnabled: false,
+        });
+        relay({ discStyleEnabled: true, enabled: false, spotifyCanvasEnabled: false });
+        setDiscStyleControlLock(true);
+      } else {
+        const previous = current.discArtworkPrevious || { enabled: true, spotifyCanvasEnabled: true };
+        chrome.storage.local.set({
+          discStyleEnabled: false,
+          enabled: previous.enabled !== false,
+          spotifyCanvasEnabled: previous.spotifyCanvasEnabled !== false,
+        });
+        chrome.storage.local.remove('discArtworkPrevious');
+        relay({
+          discStyleEnabled: false,
+          enabled: previous.enabled !== false,
+          spotifyCanvasEnabled: previous.spotifyCanvasEnabled !== false,
+        });
+        setDiscStyleControlLock(false);
+      }
+    });
   });
 
   lyricsToggle.addEventListener('change', () => {
