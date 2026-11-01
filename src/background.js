@@ -1227,3 +1227,58 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     .catch(e => sendResponse({ ok: false, error: String(e?.message || e) }));
   return true;
 });
+
+
+// ── Cross-origin fetch relay for content scripts (see net.js) ──
+// Only answers extension content scripts on YouTube Music, and only for
+// https hosts already listed in host_permissions.
+(() => {
+  const hostRules = (chrome.runtime.getManifest().host_permissions || [])
+    .filter((p) => p.startsWith('https://'))
+    .map((p) => {
+      const host = p.slice('https://'.length).split('/')[0];
+      return host.startsWith('*.')
+        ? { suffix: host.slice(2) }
+        : { exact: host };
+    });
+  const hostAllowed = (hostname) => hostRules.some((r) => (r.exact ? hostname === r.exact : (hostname === r.suffix || hostname.endsWith('.' + r.suffix))));
+
+  const toB64 = (buf) => {
+    const bytes = new Uint8Array(buf);
+    let s = '';
+    for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return btoa(s);
+  };
+
+  chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (!msg || msg.type !== 'VIVI_NET_FETCH') return false;
+    (async () => {
+      try {
+        if (sender.id !== chrome.runtime.id || !String(sender.url || sender.tab?.url || '').startsWith('https://music.youtube.com/')) {
+          throw new Error('sender not allowed');
+        }
+        const u = new URL(msg.url);
+        if (u.protocol !== 'https:' || !hostAllowed(u.hostname)) throw new Error('host not allowed: ' + u.hostname);
+        const i = msg.init || {};
+        const res = await fetch(u.href, {
+          method: i.method || 'GET',
+          headers: i.headers || {},
+          body: i.body ?? undefined,
+          credentials: i.credentials || 'same-origin',
+          cache: i.cache || 'default',
+          redirect: 'follow',
+        });
+        sendResponse({
+          ok: true,
+          status: res.status,
+          statusText: res.statusText,
+          headers: [...res.headers.entries()],
+          body: toB64(await res.arrayBuffer()),
+        });
+      } catch (e) {
+        sendResponse({ ok: false, error: String((e && e.message) || e) });
+      }
+    })();
+    return true;
+  });
+})();

@@ -8,6 +8,10 @@
  * check passes; the extension stays unlocked
  * permanently once verified (no rechecks). Fresh installs get a 10-minute
  * grace period first; updates never show the overlay.
+ *
+ * The overlay has a "Show it later" button. It hides the overlay for the
+ * current tab session only (sessionStorage): a freshly opened tab shows it
+ * again, and it keeps coming back until the user verifies.
  */
 
 (() => {
@@ -15,6 +19,7 @@
 
   const REPO_URL = 'https://github.com/Archimetrix/VIVIMUSIC_WEB';
   const OVERLAY_ID = 'vivi-star-gate';
+  const SNOOZE_KEY = 'vivi_gate_snoozed';
 
   const baseStyle = `
     position: fixed; inset: 0; z-index: 2147483647;
@@ -26,19 +31,44 @@
 
 
 
+  // "Show it later" — per tab session. sessionStorage is cleared when the tab
+  // is closed, so a fresh tab shows the gate again until the user verifies.
+  let snoozed = false;
+  try { snoozed = sessionStorage.getItem(SNOOZE_KEY) === '1'; } catch { /* storage blocked */ }
+
+  function snooze() {
+    snoozed = true;
+    try { sessionStorage.setItem(SNOOZE_KEY, '1'); } catch { /* best effort */ }
+    const el = document.getElementById(OVERLAY_ID);
+    if (!el) return;
+    el.classList.add('gate-leaving');           // smooth fade (see gate.css)
+    setTimeout(() => el.remove(), 480);
+  }
+
+  const LATER_HTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>Show it later';
+
   function render(html) {
-    let el = document.getElementById(OVERLAY_ID);
+    // While snoozed, always build off-screen (also avoids reviving a fading overlay).
+    let el = snoozed ? null : document.getElementById(OVERLAY_ID);
     if (!el) {
       el = document.createElement('div');
       el.id = OVERLAY_ID;
       el.style.cssText = baseStyle;
-      (document.documentElement || document.body).appendChild(el);
+      // If the user already snoozed this tab, keep rendering off-screen so a
+      // background verification can still finish without re-showing the gate.
+      if (!snoozed) (document.documentElement || document.body).appendChild(el);
     }
     el.replaceChildren();
+    el.classList.remove('gate-leaving');
+    const later = document.createElement('button');
+    later.type = 'button';
+    later.className = 'gate-later';
+    later.innerHTML = LATER_HTML;
+    later.addEventListener('click', snooze);
     const stage = document.createElement('div');
     stage.className = 'gate-stage';
     stage.innerHTML = html;
-    el.append(stage);
+    el.append(later, stage);
     return el;
   }
 
@@ -213,6 +243,7 @@
         graceTimer = setTimeout(() => checkStatus(), res.graceMs + 500);
         return;
       }
+      if (snoozed) return;           // user chose "Show it later" in this tab
       renderLocked();
     });
   }

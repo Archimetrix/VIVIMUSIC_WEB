@@ -33,6 +33,12 @@
     #vivi-star-gate .gate-copy:hover { border-color: rgba(163,148,255,.5); background: rgba(126,109,255,.14); }
     #vivi-star-gate .gate-wait { display: flex; align-items: center; gap: 8px; margin-top: 14px; color: #a7a6b5; font-size: 11px; }
     #vivi-star-gate .gate-spinner { width: 13px; height: 13px; border: 2px solid rgba(255,255,255,.2); border-top-color: #9e91ff; border-radius: 50%; animation: gate-spin .8s linear infinite; }
+    #vivi-star-gate { transition: opacity .42s ease; }
+    #vivi-star-gate.gate-leaving { opacity: 0; pointer-events: none; }
+    #vivi-star-gate.gate-leaving .gate-stage { transform: translateY(8px) scale(.985); transition: transform .42s ease; }
+    #vivi-star-gate .gate-later { position: absolute; top: 18px; right: 20px; z-index: 2; display: inline-flex; align-items: center; gap: 8px; padding: 10px 15px; border: 1px solid rgba(255,255,255,.14); border-radius: 999px; color: #d9d8e4; background: rgba(255,255,255,.06); font: 600 11px/1 system-ui,sans-serif; cursor: pointer; transition: background .16s, border-color .16s, color .16s; }
+    #vivi-star-gate .gate-later:hover { color: #fff; background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.28); }
+    #vivi-star-gate .gate-later svg { width: 11px; height: 11px; }
     @keyframes gate-arrive { from { opacity: 0; transform: translateY(12px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
     @keyframes gate-float { to { transform: translate3d(20px,-12px,0) scale(1.12); opacity: .3; } }
     @keyframes gate-spin { to { transform: rotate(360deg); } }

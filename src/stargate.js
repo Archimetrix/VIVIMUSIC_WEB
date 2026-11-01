@@ -33,6 +33,27 @@ async function starGateGetState() {
 
 async function starGateSetState(state) {
   await chrome.storage.local.set({ vivi_star_gate: state });
+  if (state?.verified) starGateMirrorVerified();
+}
+
+// Verified users shouldn't be asked again just because the extension was
+// removed and loaded again. The manifest pins the extension ID, so a copy of
+// the verified flag in chrome.storage.sync (which follows the browser profile
+// when extension sync is on) lets a re-install recognise them. Best effort:
+// without profile sync, removing the extension also erases it.
+const STAR_SYNC_KEY = 'vivi_star_verified';
+
+async function starGateMirrorVerified() {
+  try { await chrome.storage.sync.set({ [STAR_SYNC_KEY]: { at: Date.now() } }); } catch { /* sync unavailable */ }
+}
+
+async function starGateRestoreFromSync() {
+  try {
+    const r = await chrome.storage.sync.get(STAR_SYNC_KEY);
+    if (!r?.[STAR_SYNC_KEY]) return false;
+    await chrome.storage.local.set({ vivi_star_gate: { verified: true, verifiedAt: r[STAR_SYNC_KEY].at || Date.now(), restored: true } });
+    return true;
+  } catch { return false; }
 }
 
 async function starGateStartDeviceFlow() {
@@ -91,7 +112,11 @@ async function starGateCheckStarred(token) {
 async function starGateOnInstalled(details) {
   try {
     if (details?.reason === 'install') {
-      await chrome.storage.local.set({ [STAR_INSTALL_KEY]: Date.now() });
+      // Someone who verified before (and syncs extension data) is not a new user.
+      if (!(await starGateRestoreFromSync())) {
+        const existing = (await chrome.storage.local.get(STAR_INSTALL_KEY))[STAR_INSTALL_KEY];
+        if (!existing) await chrome.storage.local.set({ [STAR_INSTALL_KEY]: Date.now() });
+      }
     } else if (details?.reason === 'update') {
       const state = await starGateGetState();
       if (!state?.verified) {
@@ -115,6 +140,7 @@ try { chrome.alarms.clear(STAR_OLD_ALARM_NAME); } catch { /* ignore */ }
 async function starGateStatus() {
   const state = await starGateGetState();
   if (state?.verified) return { verified: true, graceMs: 0 };
+  if (await starGateRestoreFromSync()) return { verified: true, graceMs: 0 };
   let { [STAR_INSTALL_KEY]: installedAt } = await chrome.storage.local.get(STAR_INSTALL_KEY);
   if (!installedAt) {
     // No install time recorded (e.g. the status query beat onInstalled).

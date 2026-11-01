@@ -4,17 +4,17 @@
 
 # Vivimusic Web
 
-**Apple Music–style Canvas artwork, Spotify Canvas, synced lyrics with romanization, Built-in Eq , Last.fm scrobbling,  Spotify → YouTube Music playlist transfer tool for YouTube Music and many more.**
+**Apple Music–style Canvas artwork, Spotify Canvas, synced lyrics with romanization, a built-in equalizer, crossfade between songs, Last.fm scrobbling, Spotify → YouTube Music playlist transfer tool for YouTube Music and many more.**
 
 [![Manifest](https://img.shields.io/badge/Manifest-V3-ff6b6b?style=flat-square)](#)
-[![Version](https://img.shields.io/badge/Version-10.0-4ecdc4?style=flat-square)](#)
+[![Version](https://img.shields.io/badge/Version-10.1.0-4ecdc4?style=flat-square)](#)
 [![Browsers](https://img.shields.io/badge/Chrome%20%7CFirefox%20%7C%20All%20Firefox%20Based%20Browsers%20%7cAll%20Chromium%20Browsers-supported-6c5ce7?style=flat-square)](#)
 [![Copyright](https://img.shields.io/badge/Copyright-%C2%A9%202026%20Archimetrix.%20All%20rights%20reserved-f39c12?style=flat-square)](LICENSE)
 </div>
 
 ---
 
-Vivimusic Web is a browser extension that reskins **[music.youtube.com](https://music.youtube.com)** with animated Canvas-style backgrounds (like Apple Music/Spotify Canvas), word-synced lyrics, an audio equalizer, SponsorBlock skipping, Last.fm scrobbling, and a dark, glassy theme — without needing a separate desktop app .
+Vivimusic Web is a browser extension that reskins **[music.youtube.com](https://music.youtube.com)** with animated Canvas-style backgrounds (like Apple Music/Spotify Canvas), word-synced lyrics, an audio equalizer with crossfade between songs, SponsorBlock skipping, Last.fm scrobbling, and a dark, glassy theme — without needing a separate desktop app .
 
 This extension is **not published on the Chrome Web Store**. It's distributed as source from this repository and loaded manually as an "unpacked" extension. Follow the installation guide below — it takes about a minute.
 
@@ -75,6 +75,9 @@ This extension is **not published on the Chrome Web Store**. It's distributed as
 - 🔄 **Spotify → YouTube Music Playlist Transfer** — Transfer your Spotify playlists and Liked Songs directly from the browser into YouTube Music without sending your library to a VIVIMUSIC server. The transfer page shows which Spotify account and which YouTube Music account are connected, lets you search and multi-select, shows live per-playlist progress with a **Stop** button, and finishes with a results summary (links to the new playlists and a list of tracks that were not found). See [the transfer guide](#spotify--youtube-music-playlist-transfer).
 - 🎨 **THEME** — A full dark, glassy visual reskin of YouTube Music, toggleable independently of Canvas and Lyrics.
 - 🌊 **Kawarp Background Engine** — The animated Canvas background is fully tunable from the popup: opacity, warp intensity, blur passes, saturation, brightness, dithering, animation speed, and transition duration all have live sliders, plus a "pause when inactive" toggle and a one-click **Reset to defaults** button. There's also an "artwork/image-only" mode if you'd rather skip the warped background animation entirely and just show static art.
+- 💿 **Vinyl Disc Artwork** — Show the player artwork as a rotating record. The tonearm parks when playback pauses and returns when it resumes. (Turning this on switches off Apple Music artwork and Spotify Canvas.)
+- 🏷️ **Icons-only Player Tabs** — Replace the Up next / Lyrics / Comments / Related labels with icons; the active tab glows.
+- 🎶 **Crossfade (Beta)** — Blend the end of one song into the start of the next instead of a hard cut. Choose a length from 1 to 12 seconds in the **Audio playback** card. It is off by default, uses smooth equal-power fades, and is automatically skipped for ads, repeat-one and very short tracks.
 - 🎚️ **Built-in Equalizer** — A toggleable 3-band equalizer (low / mid / high) with a room-reverb send and one-click presets (Bass Boost, Clear Vocals, Empty Room), available from the full player screen.
 - 🎤 **Synced Lyrics** — Syllable-synced lyrics when available, then word-synced, then line-synced, then plain lyrics. Pulled from multiple providers so you almost always get *something*.
 - 🔀 **Multiple Lyrics Providers** — Toggle individual sources on or off:
@@ -95,7 +98,9 @@ This extension is **not published on the Chrome Web Store**. It's distributed as
 - 🎧 **Last.fm Scrobbling** — Sign in through Last.fm's browser authorization page (or with username and password), scrobble what you listen to, send Now Playing status, and sync Likes/Unlikes as Loves/Unloves.
 - 💾 **Local Artwork Cache** — Previously fetched artwork/Canvas links are cached locally so repeat plays load instantly. View, search, preview, export, import and clear them from the popup.
 - ⌨️ **Cache Overlay Shortcut** — Press **Alt+C** on the YouTube Music tab to see the artwork cache and the current track's live cache status without opening the popup.
+- 🔋 **Optimized & Resource Saving Mode** — One switch on the popup's home screen that pauses the heaviest effects and background work: the fluid background and Apple Music artwork lookups, the equalizer and crossfade, SponsorBlock and the no-lyrics dancer, Last.fm scrobbling, and artwork fetching/caching. Your settings are kept and apply again when you switch it off.
 - 🔔 **Update Checker** — Since this isn't on the Web Store, the popup can check this GitHub repo's [Releases](../../releases) page and let you know when a newer version is out. It does not auto-install updates.
+
 
 ---
 
@@ -146,7 +151,8 @@ All settings live in the extension popup (click the Vivimusic icon in your toolb
 | **Apple Music Animated Artwork** | Turns the animated artwork/background feature on or off. |
 | **Image-only mode** | Shows static artwork instead of the animated looping Canvas video (less data and CPU). |
 | **Fluid Background (Kawarp)** | Enables the animated warp effect, with an expandable panel of fine-tuning sliders: opacity, warp intensity, blur passes, saturation, brightness, dithering, animation speed, transition duration, plus a "pause when inactive" toggle and a **Reset to defaults** button. |
-| **Equalizer** | Shows or hides the floating equalizer button on the full player screen. |
+| **Audio playback → Equalizer** | Shows or hides the floating equalizer button on the full player screen. |
+| **Audio playback → Crossfade (Beta)** | Turns the blend between songs on or off (off by default). A **Crossfade length** slider sets it from 1 to 12 seconds. It needs a little normal playback before the end of a song to prepare, so if you drag the seek bar, avoid landing within the last minute of a song. |
 | **Synced Lyrics** | Turns the custom lyrics panel on or off. |
 | **Auto-open Lyrics tab** | Automatically switches to the Lyrics tab when a new track starts. |
 | **Romanization** | Off, Romanized only, or Original + romanized. |
@@ -160,6 +166,8 @@ All settings live in the extension popup (click the Vivimusic icon in your toolb
 | **Lyrics providers** | Toggle individual lyrics sources on/off. |
 | **Customize provider priority** | Enables custom priority ordering (1st / 2nd / 3rd), with a "wait for priority source" toggle. |
 | **Theme** | Toggles the full visual reskin independently of Canvas/Lyrics. |
+| **Vinyl disc artwork** | Shows the player artwork as a rotating record with a tonearm. Turns off Apple Music artwork and Spotify Canvas while on. |
+| **Player tabs: icons only** | Replaces the Up next, Lyrics, Comments and Related labels with icons. |
 | **Spotify Canvas** | Enables Spotify Canvas videos for YT Music tracks; connect via login or `sp_dc` cookie. |
 | **When both are available, prefer** | Chooses Apple Music artwork or Spotify Canvas when a track has both. |
 | **Playlist transfer** | Opens the client-side Spotify → YouTube Music transfer tool (Beta). Select playlists and/or Liked Songs and transfer them into private YouTube Music playlists. |
@@ -171,6 +179,9 @@ All settings live in the extension popup (click the Vivimusic icon in your toolb
 | **Scrobble delay (min)** | Or once this many minutes have played — whichever threshold is reached first. |
 | **Artwork Cache** | Shows how many songs are cached locally, with search, preview, **Export**, **Import** and a one-click **Clear all**. |
 | **Check for updates** | Manually checks this repo's latest release against your installed version. |
+| **Optimized & resource saving mode** | Pauses heavy effects and background activity (see the feature description above). Settings are kept. |
+| **Notification bell** | Opens developer announcements. |
+| **Report an issue (warning icon)** | Opens a new GitHub issue for this project. |
 
 ---
 
@@ -291,11 +302,14 @@ Vivimusic Web can skip the **non-music** parts of music videos — spoken intros
 
 ## Star Verification
 
-Vivimusic Web asks you to star this repository on GitHub before it unlocks. This is what the check does, so there are no surprises:
+Vivimusic Web asks you to star this repository on GitHub once before it unlocks. This is what the check does, so there are no surprises:
 
 - When you press the verify button, the extension uses **GitHub's OAuth Device Flow**: it shows you a short code, and you approve it on `github.com`. The extension never sees your GitHub password.
 - The resulting GitHub token is used for one thing only: asking GitHub whether your account has starred `Archimetrix/VIVIMUSIC_WEB`. It does not read your repositories, and it does not star or change anything on your behalf.
 - The token and the result are stored **locally in your browser** (extension storage). They are sent only to GitHub, never to a VIVIMUSIC server.
+- **Not forced.** The verification screen has a **Show it later** button. It hides the screen for that browser tab only; opening a new tab shows it again until you verify. New installs also get a 10-minute head start before it first appears.
+- **Verify once, unlocked for good.** After a successful check there are no re-checks, even if you un-star later.
+- **Already verified? You won't be asked again.** Updates never show it, and a small "verified" flag is kept in browser-synced extension storage so removing and re-adding the extension on a profile with extension sync turned on doesn't ask again either. (Without profile sync, removing the extension erases it and you would need to verify once more.)
 
 
 ---
@@ -308,7 +322,7 @@ Vivimusic Web's content scripts only run on `music.youtube.com`. Everything else
 |---|---|
 | `storage`, `unlimitedStorage` | Saves your settings and caches artwork and SponsorBlock results locally, in your browser only. |
 | `activeTab`, `tabs` | Detects the current track and communicates between the popup, the transfer page and the YouTube Music tab. |
-| `alarms` | Schedules the twice-daily update check and the weekly star re-verification. |
+| `alarms` | Schedules the twice-daily update check and the short polling used while you sign in to Last.fm through its browser page. |
 | `cookies` | Used only for Spotify login (reading/managing the `sp_dc` session cookie needed for Spotify Canvas, Spotify lyrics and the playlist transfer). |
 | `declarativeNetRequestWithHostAccess` | Adds the request headers (such as `Origin`/`Referer`) that Apple Music's and Spotify's web players require for the artwork, Canvas and playlist requests the extension makes on your behalf. |
 | `scripting` | Runs the YouTube Music page bridge used by the playlist transfer inside your logged-in YouTube Music tab. |
@@ -359,7 +373,10 @@ Double-check your username and password (not your email, unless that's what you 
 Check that **Last.fm scrobbling** is switched on and you're shown as connected in the popup. Remember scrobbles only send after your configured percentage/minutes threshold is reached, not the instant a song starts (that's what "Now Playing" is for).
 
 **The GitHub star screen keeps appearing.**
-Make sure you finished approving the code on `github.com` and that you starred `Archimetrix/VIVIMUSIC_WEB` with the same GitHub account. If you un-star the repository, the screen returns at the next weekly check. Starring again and verifying once more clears it.
+Make sure you finished approving the code on `github.com` and that you starred `Archimetrix/VIVIMUSIC_WEB` with the same GitHub account, then press the check again. You can use **Show it later** to keep listening for that browser tab in the meantime. Once verification succeeds it stays unlocked.
+
+**Crossfade isn't blending songs.**
+Check that **Crossfade** is switched on in **Audio playback** and click once anywhere on the YouTube Music page after enabling it (browsers only start audio processing after a click or key press). The first song after switching it on or reloading the tab plays normally; blending starts from the next one. It is skipped for ads, repeat-one, very short tracks, and when you seek to within the last minute of a song.
 
 **SponsorBlock isn't skipping anything.**
 Skipping only happens for music videos that SponsorBlock contributors have marked with Non-Music segments, so most tracks will have none. Make sure **Skip non-music sections (SponsorBlock)** is on in the popup.

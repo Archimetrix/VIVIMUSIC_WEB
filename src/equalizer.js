@@ -64,6 +64,7 @@
   let audioCtx = null;
   let sourceNode = null;
   let lowShelf = null;
+  let xfGate = null;
   let midPeak = null;
   let highShelf = null;
   let dryGain = null;
@@ -157,7 +158,11 @@
       spatialGainL.gain.value = 1;
       spatialGainR.gain.value = 1;
 
-      sourceNode.connect(lowShelf);
+      // Crossfade gate: a plain gain stage between the element and the EQ.
+      // It sits at 1.0 (transparent) unless crossfade.js is mid-transition.
+      xfGate = audioCtx.createGain();
+      sourceNode.connect(xfGate);
+      xfGate.connect(lowShelf);
       lowShelf.connect(midPeak);
       midPeak.connect(highShelf);
 
@@ -178,6 +183,8 @@
       compressor.connect(audioCtx.destination);
 
       boundVideo = video;
+      // Shared handle so crossfade.js can feed the same processing chain.
+      window.__viviAudioGraph = { ctx: audioCtx, video, source: sourceNode, gate: xfGate, entry: lowShelf };
       applySettingsToGraph();
       return true;
     } catch (e) {
@@ -620,7 +627,13 @@
     applySettingsToGraph();
   }
 
-  window.__viviEqualizer = { setVisible, setAllowed };
+  // Lets other modules (crossfade) request the shared graph. Must be called
+  // from a user gesture the first time so the AudioContext may start.
+  function ensureAudioGraph() {
+    return ensureGraph(findVideo()) ? window.__viviAudioGraph : null;
+  }
+
+  window.__viviEqualizer = { setVisible, setAllowed, ensureAudioGraph };
 
   function init() {
     loadSettings(() => {

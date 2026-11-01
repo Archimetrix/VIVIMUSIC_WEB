@@ -632,8 +632,23 @@
   // enforcer alive so the browser tab never falls back to "YouTube Music".
   let viviDesiredTitle = 'VIVIMUSIC';
 
+  // The browser normalises whatever is written to document.title (runs of
+  // spaces/tabs/newlines collapse to one space, ends are trimmed). A desired
+  // title that isn't already in that form can never compare equal to what
+  // document.title returns, so the observer below would rewrite it forever —
+  // each rewrite is itself a mutation — and freeze the tab. Songs whose names
+  // contain double spaces etc. triggered exactly that.
+  const normalizeTitle = (s) => String(s).replace(/[\t\n\f\r ]+/g, ' ').trim();
+  let titleWrites = [];
+
   function enforceViviTitle() {
-    if (document.title !== viviDesiredTitle) document.title = viviDesiredTitle;
+    if (document.title === viviDesiredTitle) return;
+    // Belt and braces: never fight the page more than ~20 times a second.
+    const now = performance.now();
+    titleWrites = titleWrites.filter((t) => now - t < 1000);
+    if (titleWrites.length >= 20) return;
+    titleWrites.push(now);
+    document.title = viviDesiredTitle;
   }
 
   function installViviTitleGuard() {
@@ -667,7 +682,7 @@
   function applyViviTitle(track) {
     if (!track?.song) return;
     window.__viviTitleTakeover = true;
-    viviDesiredTitle = `${track.song} | VIVIMUSIC`;
+    viviDesiredTitle = normalizeTitle(`${track.song} | VIVIMUSIC`);
     enforceViviTitle();
   }
 
@@ -2566,6 +2581,7 @@
   // allows the old Canvas to flash for a frame or two. This pre-emptive guard runs
   // during the pointer/click capture phase and invalidates every pending Canvas job.
   let canvasPreemptGuardBound = false;
+  let canvasRecoverTimer = null;
 
   function hardStopCanvasForTrackTransition() {
     canvasRenderToken++;
@@ -2664,9 +2680,30 @@
 
     const preempt = (event) => {
       if (!document.querySelector(`.${MAIN_PLAYER_CLASS}`)) return;
+      // Only a primary (left) click / touch / pen tap can start a song. A
+      // right-click opens YouTube Music's context menu ("Play next", "Add to
+      // queue", ...) and changes nothing, so it must never tear the Canvas
+      // down — that was making the Canvas vanish and never come back.
+      if (typeof event.button === 'number' && event.button !== 0) return;
       const target = event.composedPath?.().find(node => node instanceof Element) || event.target;
       if (!isLikelyTrackActivation(target)) return;
+      const keyAtStop = currentTrackKey;
       hardStopCanvasForTrackTransition();
+
+      // Safety net: we hid the Canvas expecting a new song. If, a moment later,
+      // the same song is still the current one (click didn't start anything,
+      // replay of the same track, ...), bring its Canvas back.
+      clearTimeout(canvasRecoverTimer);
+      canvasRecoverTimer = setTimeout(() => {
+        try {
+          const t = getCurrentTrack();
+          if (!t || currentTrackKey !== keyAtStop) return;          // song really changed
+          if (`${t.artist}—${t.song}` !== keyAtStop) return;
+          if (document.querySelector(`.${MAIN_PLAYER_CLASS}[data-vivi-visible]`)) return;
+          log('Canvas was hidden but the song did not change — restoring it');
+          handleTrackChange(t, { recover: true });
+        } catch (e) { warn('Canvas recovery failed', e?.message); }
+      }, 2500);
     };
 
     // pointerdown fires before the click/default navigation and is early enough
@@ -2681,14 +2718,16 @@
     }, true);
   }
 
-  async function handleTrackChange(track) {
+  async function handleTrackChange(track, { recover = false } = {}) {
     const key = `${track.artist}—${track.song}`;
-    if (key !== currentTrackKey) {
+    // recover = re-render the Canvas for the song that is already current,
+    // without redoing lyrics / SponsorBlock / title work for it.
+    if (key !== currentTrackKey && !recover) {
       window.__viviLyricsUI?.handleTrack(track);
       loadSponsorSegmentsForTrack(track).catch((e) => warn('SponsorBlock: track load failed', e?.message));
       applyViviTitle(track);
     }
-    if (key === currentTrackKey) return;
+    if (key === currentTrackKey && !recover) return;
     currentTrackKey = key;
     canvasRenderToken++;
     const trackCanvasToken = canvasRenderToken;

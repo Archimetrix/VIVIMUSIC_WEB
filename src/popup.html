@@ -97,12 +97,19 @@
     }
     .brand p {
       font-size: 10px;
-      color: var(--text-2);
-      margin-top: 3px;
+      line-height: 1.4;
+      margin-top: 4px;
       letter-spacing: 0.01em;
+      color: #e6e5ee;
     }
 
     .announcement-button { position: relative; width: 34px; height: 34px; flex: none; margin-left: auto; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 11px; color: #c8c7d6; background: rgba(255,255,255,.045); cursor: pointer; transition: .18s ease; }
+    .beta-tag { display: inline-block; margin: 0 4px 0 2px; padding: 2px 6px 1px; border: 1px solid rgba(255,128,92,.4); border-radius: 999px; background: rgba(255,128,92,.14); color: #ffa585; font-size: 8.5px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; line-height: 1.3; vertical-align: middle; }
+    .issue-button { position: relative; width: 34px; height: 34px; flex: none; margin-left: auto; margin-right: -4px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 11px; color: #f2f1f8; background: rgba(255,255,255,.04); text-decoration: none; cursor: pointer; transition: transform .18s, background .18s, border-color .18s, box-shadow .18s; }
+    .issue-button:hover, .issue-button:focus-visible { color: #fff; transform: translateY(-1px); border-color: rgba(255,255,255,.34); background: rgba(255,255,255,.1); box-shadow: 0 5px 15px -9px rgba(255,255,255,.5); }
+    .issue-button svg { width: 17px; height: 17px; }
+    .issue-button + .announcement-button { margin-left: 0; }
+    @media (prefers-reduced-motion: reduce) { .issue-button { transition: none; } }
     .announcement-button:hover, .announcement-button:focus-visible { color: #fff; border-color: rgba(149,133,255,.55); background: rgba(149,133,255,.14); box-shadow: 0 5px 15px -9px #9585ff; }
     .announcement-button svg { width: 17px; height: 17px; }
     .announcement-badge { position: absolute; top: -5px; right: -5px; min-width: 16px; height: 16px; padding: 0 4px; display: grid; place-items: center; border: 2px solid #171720; border-radius: 99px; background: #ff4f83; color: white; font: 700 9px/1 system-ui,sans-serif; }
@@ -879,9 +886,9 @@
     .view-home::-webkit-scrollbar-thumb:hover, .view-settings::-webkit-scrollbar-thumb:hover { background: rgba(174,167,216,.48); background-clip: padding-box; }
     .view-home { scrollbar-width: none; }
     .view-home::-webkit-scrollbar { display: none; width: 0; }
-    .home-intro { padding: 12px 2px 14px; }
-    .home-intro h2 { font-size: 18px; letter-spacing: -.025em; font-weight: 750; }
-    .home-intro p { margin-top: 5px; color: var(--text-2); font-size: 11px; }
+    .home-intro { padding: 8px 2px 10px; }
+    .home-intro h2 { font-size: 19px; line-height: 1.2; letter-spacing: -.02em; font-weight: 800; color: #f2b53c; background: linear-gradient(90deg, #ffe08a, #f2b53c 55%, #ffd877); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+    .home-intro p { margin-top: 4px; color: #f4f3fa; font-size: 12px; font-weight: 500; }
     .home-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; padding-bottom: 12px; }
     .home-card { --card-accent: #9585ff; position: relative; isolation: isolate; overflow: hidden; min-height: 94px; text-align: left; padding: 13px; border-radius: 14px; border: 1px solid color-mix(in srgb, var(--card-accent), transparent 74%); background: radial-gradient(ellipse at 100% 0%, color-mix(in srgb, var(--card-accent), transparent 84%), transparent 58%), linear-gradient(145deg, rgba(31,31,42,.79), rgba(19,19,27,.9)); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); color: var(--text-0); cursor: pointer; box-shadow: inset 0 1px rgba(255,255,255,.075), 0 8px 20px -16px color-mix(in srgb, var(--card-accent), transparent 50%); transition: border-color .2s, transform .2s, box-shadow .2s, background .2s; }
     .home-card:hover, .home-card:focus-visible { border-color: color-mix(in srgb, var(--card-accent), transparent 38%); background: radial-gradient(ellipse at 100% 0%, color-mix(in srgb, var(--card-accent), transparent 73%), transparent 62%), linear-gradient(145deg, rgba(37,37,50,.92), rgba(20,20,29,.96)); box-shadow: inset 0 1px rgba(255,255,255,.11), 0 10px 26px -14px color-mix(in srgb, var(--card-accent), transparent 36%); transform: translateY(-2px); }
@@ -1003,8 +1010,6 @@
     .announcement-empty { padding: 22px 14px; text-align: center; color: var(--text-2); font-size: 11px; }
     .footer { padding: 8px 0 0; }
     .footer .home-support { max-width: 100%; }
-    .footer-credit { padding: 6px 0 1px; color: var(--text-3); font-size: 9.5px; letter-spacing: .02em; text-align: center; }
-    .footer-credit span { color: #f17691; }
 
     /* GPU-acceleration notice shown before Kawarp is switched on */
     .gpu-overlay {
@@ -1129,8 +1134,11 @@
     </div>
     <div class="brand">
       <h1>Vivimusic Web</h1>
-      <p>Apple Music artwork, synced lyrics &amp; Spotify Canvas for YT Music</p>
+      <p>The most powerful &amp; feature rich extension ever created for YouTube Music.</p>
     </div>
+    <a class="issue-button" href="https://github.com/Archimetrix/VIVIMUSIC_WEB/issues/new" target="_blank" rel="noopener noreferrer" aria-label="Report an issue on GitHub" title="Report an issue on GitHub">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+    </a>
     <button class="announcement-button" type="button" aria-label="Announcements" title="Announcements">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/></svg>
       <span class="announcement-badge" hidden>0</span>
@@ -1241,9 +1249,9 @@
     </div>
   </div>
 
-  <!-- Equalizer -->
+  <!-- Audio playback -->
   <div class="section">
-    <div class="section-title"><span class="dot-ico"></span>Equalizer</div>
+    <div class="section-title"><span class="dot-ico"></span>Audio playback</div>
     <div class="row">
       <span class="row-label">Equalizer</span>
       <label class="switch">
@@ -1252,6 +1260,20 @@
       </label>
     </div>
     <p class="theme-sub">Shows the floating EQ button on the full player screen for a 3-band equalizer + reverb. Turn off to hide the button entirely.</p>
+
+    <div class="row" style="margin-top:14px">
+      <span class="row-label">Crossfade <span class="beta-tag">Beta</span></span>
+      <label class="switch">
+        <input type="checkbox" id="crossfadeToggle"/>
+        <span class="slider"></span>
+      </label>
+    </div>
+    <p class="theme-sub">Blends the end of each song into the start of the next one instead of a hard cut. Off by default. Works best for albums and playlists; it is skipped on ads, repeat-one and very short tracks.</p>
+    <p class="theme-sub"><b>Tip:</b> crossfade needs the end of the song to be loaded before it can blend. If you drag the seek bar, don't land within the last minute of a song — keep about a minute or more of normal playback before the end so the next-song blend can be prepared reliably. Otherwise that song simply ends normally.</p>
+    <div class="kawarp-slider-row" id="crossfadeSliderRow">
+      <div class="kw-label-row"><span>Crossfade length</span><span class="kw-val" id="crossfadeSecondsVal">6 s</span></div>
+      <input type="range" id="crossfadeSeconds" min="1" max="12" step="1" value="6"/>
+    </div>
   </div>
 
   <!-- Lyrics -->
@@ -1647,7 +1669,6 @@
       <a class="support-pill tea" href="https://buymeatea.online/archimetrix" target="_blank" rel="noopener noreferrer" title="For Indian users — support via UPI"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9h13v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V9Z"/><path d="M17 10.5h1.5a2.5 2.5 0 0 1 0 5H16.6"/><path d="M8 3.5c0 1.2-1 1.3-1 2.5M12 3.5c0 1.2-1 1.3-1 2.5"/></svg>Support via UPI</a>
       <a class="support-pill coffee" href="https://buymeacoffee.com/archimetrix" target="_blank" rel="noopener noreferrer"><svg class="bmc-mark" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6.9 0 5.68 2.8H3.88v2.52h.69l.7 4.48H4.17l1.46 8.23.94-.01L7.51 24h8.92l.94-5.98.89.01 1.46-8.23h-1.06l.71-4.48h.75V2.8h-1.92L16.99 0H6.9Zm.53.8h9.04l.77 1.78H6.65l.78-1.78ZM4.68 3.6h14.64v.92H4.68V3.6Zm.45 7h13.64l-1.18 6.62-5.65-.06-5.64.06-1.17-6.62Z"/></svg>Buy me a coffee</a>
     </span></div>
-    <div class="footer-credit">Made with <span aria-label="love">♥</span> by Archimetrix</div>
   </div>
 
   <div class="cache-preview-overlay" id="cachePreviewOverlay">

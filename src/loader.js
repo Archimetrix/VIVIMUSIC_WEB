@@ -82,9 +82,15 @@
   (function installTitleOverride() {
     const PLACEHOLDER = 'VIVIMUSIC';
 
+    let writes = [];
     function enforce() {
       if (window.__viviTitleTakeover) return;
-      if (document.title !== PLACEHOLDER) document.title = PLACEHOLDER;
+      if (document.title === PLACEHOLDER) return;
+      const now = performance.now();               // never fight the page in a tight loop
+      writes = writes.filter((t) => now - t < 1000);
+      if (writes.length >= 20) return;
+      writes.push(now);
+      document.title = PLACEHOLDER;
     }
 
     enforce();

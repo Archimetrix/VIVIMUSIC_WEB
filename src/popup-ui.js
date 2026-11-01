@@ -4,7 +4,7 @@
   const header = document.querySelector('.header');
   const home = document.createElement('main');
   home.className = 'view-home';
-  home.innerHTML = '<div class="home-intro"><h2>Your music, your way</h2><p>Choose a feature to view and adjust its settings.</p></div><div class="home-grid"></div><button type="button" class="rs-pill" id="resourceSaverPill" role="switch" aria-checked="false" aria-label="Optimized and resource saving mode"><span class="rs-pill-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg></span><span class="rs-pill-text"><span class="rs-pill-title">Optimized &amp; resource saving mode</span><span class="rs-pill-desc">Pauses heavy effects and background activity</span></span><span class="rs-switch" aria-hidden="true"><i></i></span></button>';
+  home.innerHTML = '<div class="home-intro"><h2>Dive into the world of music</h2><p>Your music, your way</p></div><div class="home-grid"></div><button type="button" class="rs-pill" id="resourceSaverPill" role="switch" aria-checked="false" aria-label="Optimized and resource saving mode"><span class="rs-pill-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg></span><span class="rs-pill-text"><span class="rs-pill-title">Optimized &amp; resource saving mode</span><span class="rs-pill-desc">Pauses heavy effects and background activity</span></span><span class="rs-switch" aria-hidden="true"><i></i></span></button>';
   const settings = document.createElement('main');
   settings.className = 'view-settings';
   settings.innerHTML = '<div class="panel-nav"><button class="back-btn" type="button" aria-label="Back to home">‹</button><div class="panel-icon"><img alt=""></div><div><div class="panel-heading"></div><div class="panel-caption"></div></div></div><div class="rs-notice" hidden></div><div class="settings-content"></div>';
@@ -20,7 +20,7 @@
   // Shown at the top of a feature's panel while Optimized & resource saving mode is on.
   const RS_NOTES = {
     'apple-artwork': 'The fluid background and Apple Music artwork lookups are paused while Optimized & resource saving mode is on.',
-    'equalizer': 'The equalizer is paused while Optimized & resource saving mode is on.',
+    'equalizer': 'The equalizer and crossfade are paused while Optimized & resource saving mode is on.',
     'lyrics': 'SponsorBlock and the "no lyrics" dancer are paused while Optimized & resource saving mode is on.',
     'lastfm': 'Last.fm scrobbling is paused while Optimized & resource saving mode is on.',
     'artwork-cache': 'Apple Music artwork fetching and caching are paused while Optimized & resource saving mode is on.'
@@ -28,7 +28,7 @@
   const rsNotice = settings.querySelector('.rs-notice');
   const meta = {
     Artwork: ['Apple Artwork', 'Animated cover art and fluid backgrounds', 'apple-artwork', 'static'],
-    Equalizer: ['Equalizer', 'Shape and enhance your sound', 'equalizer'],
+    'Audio playback': ['Audio playback', 'Equalizer and crossfade between songs', 'equalizer'],
     Lyrics: ['Lyrics', 'Synced lyrics and display preferences', 'lyrics'],
     Appearance: ['Appearance', 'Tune the YouTube Music look', 'appearance'],
     'Artwork Cache': ['Artwork Cache', 'Browse, import, and export saved artwork', 'artwork-cache'],
@@ -37,7 +37,7 @@
     Updates: ['Updates', 'Check your installed version', 'updates']
   };
   const sectionKey = section => section.querySelector('.section-title, .cache-title')?.textContent.trim() || '';
-  const desiredOrder = ['Artwork', 'Spotify Canvas', 'Equalizer', 'Lyrics', 'Appearance', 'Artwork Cache', 'Last.fm', 'Updates'];
+  const desiredOrder = ['Artwork', 'Spotify Canvas', 'Audio playback', 'Lyrics', 'Appearance', 'Artwork Cache', 'Last.fm', 'Updates'];
   sections.sort((a, b) => desiredOrder.indexOf(sectionKey(a)) - desiredOrder.indexOf(sectionKey(b)));
   sections.forEach(section => {
     const heading = section.querySelector('.section-title, .cache-title');

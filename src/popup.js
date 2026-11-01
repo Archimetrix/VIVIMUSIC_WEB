@@ -162,13 +162,14 @@
   };
 
   chrome.storage.local.get(
-    { enabled: true, themeEnabled: true, imageOnlyMode: false, kawarpEnabled: false, eqEnabled: false, lyricsEnabled: true, autoSwitchLyrics: true, sponsorBlockEnabled: true, lyricsShowForVideos: false, dancerOnNotFound: true, lyricsAlign: 'center', lyricsAnimationStyle: 'apple', lyricsFont: 'default', lyricsRoman: 'off', lyricsRomanJa: true, lyricsRomanLangs: null, lyricsProviders: DEFAULT_PROVIDERS, ...KAWARP_DEFAULTS },
-    ({ enabled, themeEnabled, imageOnlyMode, kawarpEnabled, eqEnabled, lyricsEnabled, autoSwitchLyrics, sponsorBlockEnabled, lyricsShowForVideos, dancerOnNotFound, lyricsAlign, lyricsAnimationStyle, lyricsFont, lyricsRoman, lyricsRomanJa, lyricsRomanLangs, lyricsProviders,
+    { enabled: true, themeEnabled: true, imageOnlyMode: false, kawarpEnabled: false, eqEnabled: false, crossfadeEnabled: false, crossfadeSeconds: 6, lyricsEnabled: true, autoSwitchLyrics: true, sponsorBlockEnabled: true, lyricsShowForVideos: false, dancerOnNotFound: true, lyricsAlign: 'center', lyricsAnimationStyle: 'apple', lyricsFont: 'default', lyricsRoman: 'off', lyricsRomanJa: true, lyricsRomanLangs: null, lyricsProviders: DEFAULT_PROVIDERS, ...KAWARP_DEFAULTS },
+    ({ enabled, themeEnabled, imageOnlyMode, kawarpEnabled, eqEnabled, crossfadeEnabled, crossfadeSeconds, lyricsEnabled, autoSwitchLyrics, sponsorBlockEnabled, lyricsShowForVideos, dancerOnNotFound, lyricsAlign, lyricsAnimationStyle, lyricsFont, lyricsRoman, lyricsRomanJa, lyricsRomanLangs, lyricsProviders,
        kawarpPauseWhenInactive, kawarpOpacity, kawarpWarpIntensity, kawarpBlurPasses, kawarpSaturation, kawarpBrightness, kawarpDithering, kawarpAnimationSpeed, kawarpTransitionDuration }) => {
       enableToggle.checked = enabled;
       imageOnlyToggle.checked = imageOnlyMode;
       kawarpToggle.checked = kawarpEnabled;
       eqToggle.checked = eqEnabled;
+      paintCrossfade(crossfadeEnabled === true, crossfadeSeconds);
       themeToggle.checked  = themeEnabled;
       lyricsToggle.checked = lyricsEnabled;
       autoSwitchToggle.checked = autoSwitchLyrics;
@@ -377,6 +378,29 @@
     }
     chrome.storage.local.set({ kawarpEnabled: false });
     relay({ kawarpEnabled: false });
+  });
+
+  // ── Crossfade (Audio playback card) ──
+  // Storage-only: the page script watches chrome.storage, so no relay needed.
+  const crossfadeToggle = document.getElementById('crossfadeToggle');
+  const crossfadeSeconds = document.getElementById('crossfadeSeconds');
+  const crossfadeSecondsVal = document.getElementById('crossfadeSecondsVal');
+  const crossfadeSliderRow = document.getElementById('crossfadeSliderRow');
+  function paintCrossfade(on, secs) {
+    const n = Math.min(12, Math.max(1, Math.round(Number(secs)) || 6));
+    crossfadeToggle.checked = on;
+    crossfadeSeconds.value = n;
+    crossfadeSecondsVal.textContent = n + ' s';
+    crossfadeSliderRow.style.opacity = on ? '1' : '0.45';
+    crossfadeSeconds.disabled = !on;
+  }
+  crossfadeToggle.addEventListener('change', () => {
+    paintCrossfade(crossfadeToggle.checked, crossfadeSeconds.value);
+    chrome.storage.local.set({ crossfadeEnabled: crossfadeToggle.checked });
+  });
+  crossfadeSeconds.addEventListener('input', () => {
+    paintCrossfade(crossfadeToggle.checked, crossfadeSeconds.value);
+    chrome.storage.local.set({ crossfadeSeconds: Number(crossfadeSeconds.value) });
   });
 
   eqToggle.addEventListener('change', () => {
