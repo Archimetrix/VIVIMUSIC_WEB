@@ -1071,86 +1071,124 @@ html.vivi-disc-style.vivi-disc-full-player.vivi-disc-playing ytmusic-player #son
   animation-play-state: running;
 }
 
+/* Static record finish: fine grooves, a rim and two light reflections. It does
+   not spin, so the reflections stay put while the artwork rotates underneath
+   (like light on a real record). */
 html.vivi-disc-style.vivi-disc-full-player ytmusic-player #song-image::before {
   content: "";
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  background: radial-gradient(circle, transparent 0 48%, rgba(255,255,255,.18) 48.3% 48.7%, transparent 49% 66%, rgba(255,255,255,.12) 66.3% 66.7%, transparent 67% 82%, rgba(255,255,255,.16) 82.3% 82.7%, transparent 83%);
+  background:
+    radial-gradient(circle, transparent 0 91%, rgba(0,0,0,.55) 96%, rgba(0,0,0,.85) 100%),
+    conic-gradient(from 25deg, transparent 0 7%, rgba(255,255,255,.20) 12%, transparent 19% 50%, rgba(255,255,255,.16) 62%, transparent 69% 100%),
+    repeating-radial-gradient(circle, rgba(255,255,255,.00) 0 2.5px, rgba(255,255,255,.07) 3px, rgba(0,0,0,.10) 4px, rgba(255,255,255,0) 5px),
+    radial-gradient(circle, rgba(0,0,0,0) 55%, rgba(0,0,0,.22) 100%);
+  box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.14), inset 0 0 22px rgba(0,0,0,.45);
   pointer-events: none;
   z-index: 4;
-  animation: vivi-vinyl-spin 16s linear infinite;
-  animation-play-state: paused;
 }
 
+/* Shine effect off: same finish without the light reflections. */
+html.vivi-disc-style.vivi-disc-full-player.vivi-disc-no-shine ytmusic-player #song-image::before {
+  background:
+    radial-gradient(circle, transparent 0 91%, rgba(0,0,0,.55) 96%, rgba(0,0,0,.85) 100%),
+    repeating-radial-gradient(circle, rgba(255,255,255,.00) 0 2.5px, rgba(255,255,255,.07) 3px, rgba(0,0,0,.10) 4px, rgba(255,255,255,0) 5px),
+    radial-gradient(circle, rgba(0,0,0,0) 55%, rgba(0,0,0,.22) 100%);
+}
+
+/* Centre hub + spindle hole */
 html.vivi-disc-style.vivi-disc-full-player ytmusic-player #song-image::after {
   content: "";
   position: absolute;
-  left: 46%;
-  top: 46%;
-  width: 8%;
-  height: 8%;
+  left: 44.5%;
+  top: 44.5%;
+  width: 11%;
+  height: 11%;
   border-radius: 50%;
-  background: radial-gradient(circle, #17171c 0 24%, #c2c4cc 27% 38%, #262730 42% 100%);
-  box-shadow: 0 0 0 1px rgba(255,255,255,.28);
+  background: radial-gradient(circle, #050507 0 13%, #c9ccd6 15% 22%, #2b2c36 25% 52%, rgba(255,255,255,.35) 54% 56%, #101116 58% 100%);
+  box-shadow: 0 0 0 1.5px rgba(0,0,0,.6), 0 0 0 3px rgba(255,255,255,.10), 0 2px 8px rgba(0,0,0,.6);
   pointer-events: none;
   z-index: 6;
 }
 
-html.vivi-disc-style.vivi-disc-full-player.vivi-disc-playing ytmusic-player #song-image::before {
-  animation-play-state: running;
+/* Soft depth + accent glow behind the record */
+html.vivi-disc-style.vivi-disc-full-player ytmusic-player #song-media-window {
+  filter: drop-shadow(0 18px 28px rgba(0,0,0,.55)) drop-shadow(0 0 22px color-mix(in srgb, var(--accent, #c88cff) 28%, transparent));
 }
 
+/* Reveal gating: the disc stays invisible while YouTube Music is still
+   animating the player open, then fades in together with the tonearm. */
+html.vivi-disc-style.vivi-disc-full-player:not(.vivi-disc-revealed) ytmusic-player #song-image {
+  opacity: 0 !important;
+  transition: none !important;
+}
+html.vivi-disc-style.vivi-disc-full-player.vivi-disc-revealed ytmusic-player #song-image {
+  opacity: 1;
+  transition: opacity 480ms ease;
+}
+
+/* ── Tonearm ──
+   A fixed square laid over the disc (see placeDiscArm). Pivot sits at the
+   top-right of the record. The inner group swings around the pivot:
+   0deg = needle on the record, negative = parked off to the right. */
 .vivi-disc-tonearm {
   display: none;
   position: fixed;
-  width: 49%;
-  height: 7px;
-  top: 7%;
-  right: -1%;
-  border-radius: 8px;
-  background: linear-gradient(180deg, #f4f5f8 0%, #888b95 42%, #343640 100%);
-  box-shadow: 0 1px 5px rgba(0,0,0,.6);
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
   opacity: 0;
   visibility: hidden;
-  transform: rotate(20deg);
-  transform-origin: left center;
-  transition: transform 700ms cubic-bezier(.2,.75,.25,1), opacity 160ms ease;
-  pointer-events: none;
-  z-index: 2147483001;
+  z-index: 50; /* real value is set from the top bar's layer in content.js */
+  filter: drop-shadow(0 6px 6px rgba(0,0,0,.55)) drop-shadow(0 0 1px rgba(0,0,0,.8));
+  transition: opacity 420ms ease;
 }
-
+.vivi-disc-tonearm .vivi-arm-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.vivi-disc-tonearm .vivi-arm-drift,
+.vivi-disc-tonearm .vivi-arm-swing {
+  transform-box: view-box;
+  transform-origin: 102px 6px;
+}
+/* Park position: swung away from the record. Same easing both ways so pausing
+   lifts the arm off just as smoothly as resuming lowers it. */
+.vivi-disc-tonearm .vivi-arm-swing {
+  transform: rotate(-27deg);
+  transition: transform 900ms cubic-bezier(.45,.05,.2,1);
+}
 html.vivi-disc-style.vivi-disc-full-player .vivi-disc-tonearm { display: block; }
 html.vivi-disc-arm-ready .vivi-disc-tonearm {
   opacity: 1;
   visibility: visible;
 }
-
-.vivi-disc-tonearm::before {
-  content: "";
-  position: absolute;
-  left: -5px;
-  top: -3px;
-  width: 13px;
-  height: 13px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #fff, #777a84 58%, #272932 75%);
-  box-shadow: 0 0 0 1px rgba(0,0,0,.65);
+html.vivi-disc-style.vivi-disc-full-player.vivi-disc-arm-ready.vivi-disc-playing .vivi-arm-swing {
+  transform: rotate(0deg);
+  /* Small delay so on first reveal the disc appears before the arm drops. */
+  transition: transform 1100ms cubic-bezier(.3,.85,.3,1) 220ms;
 }
-
-.vivi-disc-tonearm::after {
-  content: "";
-  position: absolute;
-  right: -2px;
-  bottom: -2px;
-  width: 9px;
-  height: 3px;
-  border-radius: 2px;
-  background: #d9dbe2;
+/* Fallback only (top bar layer unreadable): hide the arm while searching. */
+html.vivi-disc-search-active .vivi-disc-tonearm[data-vivi-layer-fallback="1"] {
+  opacity: 0 !important;
 }
-
-html.vivi-disc-style.vivi-disc-full-player.vivi-disc-playing .vivi-disc-tonearm {
-  transform: rotate(-43deg);
+/* Tiny groove-following drift. It lives on its own group and is only paused
+   (never removed) when playback stops, so there is no snap when pausing. */
+.vivi-disc-tonearm .vivi-arm-drift {
+  animation: vivi-arm-track 40s ease-in-out infinite alternate;
+  animation-play-state: paused;
+}
+html.vivi-disc-playing .vivi-disc-tonearm .vivi-arm-drift {
+  animation-play-state: running;
+}
+@keyframes vivi-arm-track {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(1.6deg); }
 }
 
 /* Vinyl styling is limited to the full-player artwork. Home shelves and the

@@ -2108,6 +2108,7 @@
   let kawarpUserEnabled = false; // off by default; the popup turns it on
   let eqUserEnabled = false;
   let discStyleEnabled = false;
+  let discShineEnabled = true;
   let discArtworkResizeObserver = null;
   let discObservedArtwork = null;
   let discArmPlacementTimer = null;
@@ -2253,66 +2254,121 @@
     });
   }
 
+  const DISC_ARM_SVG = `<svg class="vivi-arm-svg" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><defs><linearGradient id="viviArmTube" gradientUnits="userSpaceOnUse" x1="99" y1="0" x2="105" y2="0"><stop offset="0" stop-color="#6b6e7a"/><stop offset=".35" stop-color="#f4f5fa"/><stop offset=".6" stop-color="#b4b7c3"/><stop offset="1" stop-color="#3a3c47"/></linearGradient><radialGradient id="viviArmBase" cx=".38" cy=".32" r=".8"><stop offset="0" stop-color="#4a4c58"/><stop offset=".55" stop-color="#1b1c24"/><stop offset="1" stop-color="#08080c"/></radialGradient><radialGradient id="viviArmCap" cx=".35" cy=".3" r=".85"><stop offset="0" stop-color="#ffffff"/><stop offset=".45" stop-color="#b9bcc8"/><stop offset="1" stop-color="#4b4d59"/></radialGradient><linearGradient id="viviArmShell" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#14151c"/><stop offset=".45" stop-color="#4a4d5a"/><stop offset="1" stop-color="#101117"/></linearGradient><linearGradient id="viviArmWeight" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#15161d"/><stop offset=".4" stop-color="#5d606d"/><stop offset="1" stop-color="#14151b"/></linearGradient></defs><g transform="translate(102 94) scale(.78 -.78) translate(-102 -6)"><g class="vivi-arm-drift"><g class="vivi-arm-swing"><g transform="rotate(16.6 102 6)"><rect x="98.6" y="-14" width="6.8" height="17" rx="1.6" fill="url(#viviArmWeight)" stroke="#07070a" stroke-width=".4"/><rect x="98.6" y="-8" width="6.8" height=".7" fill="#000" opacity=".55"/><rect x="98.6" y="-5.5" width="6.8" height=".7" fill="#000" opacity=".55"/><path d="M102 6 L102 52 C102 63 97.5 68 94.5 73" fill="none" stroke="#07070a" stroke-opacity=".9" stroke-width="3.2" stroke-linecap="round"/><path d="M102 6 L102 52 C102 63 97.5 68 94.5 73" fill="none" stroke="url(#viviArmTube)" stroke-width="2.3" stroke-linecap="round"/><path d="M101.5 8 L101.5 51" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width=".4" stroke-linecap="round"/><g transform="translate(94.5 73) rotate(27)"><rect x="-3.6" y="-2" width="7.2" height="9" rx="1.4" fill="url(#viviArmShell)" stroke="#05050a" stroke-width=".5"/><rect x="2.6" y="-1" width="4.6" height="1.5" rx=".7" fill="#b7bac6" stroke="#05050a" stroke-width=".3"/><rect x="-2.6" y="6.2" width="5.2" height="5.6" rx=".9" fill="#1a1b22" stroke="#05050a" stroke-width=".4"/><rect x="-2.1" y="6.9" width="4.2" height="1.1" rx=".5" fill="var(--vivi-arm-accent,#c88cff)"/><rect x="-1.5" y="8.6" width="3" height="2.4" rx=".5" fill="#c98a56"/></g></g><circle cx="102" cy="6" r="8.2" fill="#000" opacity=".35"/><circle cx="102" cy="6" r="7" fill="url(#viviArmBase)" stroke="#2c2d37" stroke-width=".5"/><circle cx="102" cy="6" r="5" fill="none" stroke="#8d909c" stroke-opacity=".5" stroke-width=".4"/><circle cx="102" cy="6" r="3.3" fill="url(#viviArmCap)" stroke="#16171d" stroke-width=".4"/><circle cx="102" cy="6" r="1.1" fill="#202129"/></g></g></g></svg>`;
+
   function cancelDiscArmPlacement() {
     if (discArmPlacementTimer) clearTimeout(discArmPlacementTimer);
     discArmPlacementTimer = null;
-    document.documentElement.classList.remove('vivi-disc-arm-ready');
+    stopDiscArmTracking();
+    discArmLastBox = '';
+    const root = document.documentElement;
+    root.classList.remove('vivi-disc-arm-ready');
+    root.classList.remove('vivi-disc-revealed');
   }
 
-  function scheduleDiscArmPlacement(artwork, arm, bounds) {
-    const target = {
-      left: bounds.left + bounds.width * 0.04,
-      top: bounds.top + bounds.height * 0.91,
-      width: bounds.width * 0.49,
-    };
-    const placed = {
-      left: parseFloat(arm.style.left) || 0,
-      top: parseFloat(arm.style.top) || 0,
-      width: parseFloat(arm.style.width) || 0,
-    };
-    if (document.documentElement.classList.contains('vivi-disc-arm-ready') &&
-        Math.abs(placed.left - target.left) < 2 &&
-        Math.abs(placed.top - target.top) < 2 &&
-        Math.abs(placed.width - target.width) < 2) return;
+  let discArmLastBox = '';
+  let discArmRaf = 0;
 
+  function placeDiscArm(arm, bounds) {
+    // The arm's SVG uses a 100-unit box equal to the disc size, so it only
+    // needs to be laid over the artwork square.
+    const box = `${bounds.left.toFixed(1)}|${bounds.top.toFixed(1)}|${bounds.width.toFixed(1)}`;
+    if (box === discArmLastBox && arm.style.width) return;
+    discArmLastBox = box;
+    arm.style.left = `${bounds.left}px`;
+    arm.style.top = `${bounds.top}px`;
+    arm.style.width = `${bounds.width}px`;
+    arm.style.height = `${bounds.width}px`;
+  }
+
+  // Keep the arm just underneath YouTube Music's top bar so the search
+  // suggestions dropdown (and menus) draw over it instead of under it.
+  function syncDiscArmLayer(arm) {
+    let z = NaN;
+    try {
+      const nav = document.querySelector('ytmusic-nav-bar');
+      if (nav) z = parseInt(getComputedStyle(nav).zIndex, 10);
+    } catch (_) {}
+    if (Number.isFinite(z) && z > 1) {
+      arm.style.zIndex = String(z - 1);
+      delete arm.dataset.viviLayerFallback;
+    } else {
+      // Couldn't read the top bar's layer: use a moderate layer and let CSS
+      // hide the arm while the search box is active.
+      arm.style.zIndex = '50';
+      arm.dataset.viviLayerFallback = '1';
+    }
+  }
+
+  // Follow the artwork every frame while the disc is shown. The layout can move
+  // the artwork without resizing it (e.g. opening/closing the side menu), which
+  // ResizeObserver never reports, so the arm used to trail behind the disc.
+  function startDiscArmTracking() {
+    if (discArmRaf) return;
+    const tick = () => {
+      discArmRaf = 0;
+      const root = document.documentElement;
+      if (!discStyleEnabled || document.hidden || !root.classList.contains('vivi-disc-revealed')) return;
+      const art = document.querySelector('ytmusic-player #song-image');
+      const arm = document.querySelector('.vivi-disc-tonearm');
+      if (art && arm) {
+        const b = art.getBoundingClientRect();
+        if (b.width >= 260 && b.height >= 260) placeDiscArm(arm, b);
+      }
+      discArmRaf = requestAnimationFrame(tick);
+    };
+    discArmRaf = requestAnimationFrame(tick);
+  }
+
+  function stopDiscArmTracking() {
+    if (discArmRaf) cancelAnimationFrame(discArmRaf);
+    discArmRaf = 0;
+  }
+
+  // The disc and the tonearm are revealed together, only once YouTube Music's
+  // expand animation has stopped moving the artwork. Until then the artwork is
+  // kept invisible, so going mini -> full no longer shows a bare CD first and
+  // then pops the arm in.
+  function scheduleDiscArmPlacement(artwork, arm, bounds) {
+    const root = document.documentElement;
+    if (root.classList.contains('vivi-disc-revealed')) {
+      placeDiscArm(arm, bounds);
+      startDiscArmTracking();
+      return;
+    }
     if (discArmPlacementTimer) clearTimeout(discArmPlacementTimer);
-    document.documentElement.classList.remove('vivi-disc-arm-ready');
     discArmPlacementTimer = setTimeout(() => {
       discArmPlacementTimer = null;
       const latestArtwork = document.querySelector('ytmusic-player #song-image');
       const latestBounds = latestArtwork?.getBoundingClientRect();
-      if (!discStyleEnabled || latestArtwork !== artwork || document.hidden ||
+      if (!discStyleEnabled || latestArtwork !== artwork ||
           !isMainPlayerPageActive() || !latestBounds || latestBounds.width < 260 || latestBounds.height < 260) {
         syncDiscTonearm();
         return;
       }
-
-      const latest = {
-        left: latestBounds.left + latestBounds.width * 0.04,
-        top: latestBounds.top + latestBounds.height * 0.91,
-        width: latestBounds.width * 0.49,
-      };
-      if (Math.abs(latest.left - target.left) > 2 ||
-          Math.abs(latest.top - target.top) > 2 ||
-          Math.abs(latest.width - target.width) > 2) {
+      if (Math.abs(latestBounds.left - bounds.left) > 1.5 ||
+          Math.abs(latestBounds.top - bounds.top) > 1.5 ||
+          Math.abs(latestBounds.width - bounds.width) > 1.5) {
         scheduleDiscArmPlacement(artwork, arm, latestBounds);
         return;
       }
-
-      arm.style.left = `${latest.left}px`;
-      arm.style.top = `${latest.top}px`;
-      arm.style.width = `${latest.width}px`;
-      arm.style.right = 'auto';
-      arm.style.bottom = 'auto';
-      document.documentElement.classList.add('vivi-disc-arm-ready');
-    }, 220);
+      placeDiscArm(arm, latestBounds);
+      syncDiscArmLayer(arm);
+      root.classList.add('vivi-disc-revealed');
+      startDiscArmTracking();
+      // Let the disc start fading in first, then bring the arm in.
+      requestAnimationFrame(() => root.classList.add('vivi-disc-arm-ready'));
+    }, 260);
   }
 
   function syncDiscTonearm() {
     const artwork = document.querySelector('ytmusic-player #song-image');
     const bounds = artwork?.getBoundingClientRect();
+    // Deliberately NOT gated on document.hidden: tearing the disc down while
+    // the tab is in the background made the plain square thumbnail flash for a
+    // moment when switching back. Hidden tabs keep the disc state as-is.
     const fullPlayer = !!bounds && bounds.width >= 260 && bounds.height >= 260 &&
-      !document.hidden && isMainPlayerPageActive();
+      isMainPlayerPageActive();
     document.documentElement.classList.toggle(
       'vivi-disc-full-player',
       discStyleEnabled && fullPlayer
@@ -2339,6 +2395,8 @@
       arm = document.createElement('span');
       arm.className = 'vivi-disc-tonearm';
       arm.setAttribute('aria-hidden', 'true');
+      arm.innerHTML = DISC_ARM_SVG;
+      syncDiscArmLayer(arm);
       document.body.appendChild(arm);
     }
     scheduleDiscArmPlacement(artwork, arm, bounds);
@@ -2349,6 +2407,11 @@
     const playing = !!video && !video.paused && !video.ended;
     document.documentElement.classList.toggle('vivi-disc-playing', playing);
     syncDiscTonearm();
+  }
+
+  function applyDiscShine(enabled) {
+    discShineEnabled = enabled !== false;
+    document.documentElement.classList.toggle('vivi-disc-no-shine', !discShineEnabled);
   }
 
   function applyDiscStyle(enabled) {
@@ -3159,6 +3222,12 @@
   document.addEventListener('playing', updateDiscPlaybackState, true);
   document.addEventListener('pause', updateDiscPlaybackState, true);
   document.addEventListener('ended', updateDiscPlaybackState, true);
+  document.addEventListener('focusin', (e) => {
+    if (e.target?.closest?.('ytmusic-search-box')) document.documentElement.classList.add('vivi-disc-search-active');
+  }, true);
+  document.addEventListener('focusout', (e) => {
+    if (e.target?.closest?.('ytmusic-search-box')) document.documentElement.classList.remove('vivi-disc-search-active');
+  }, true);
   window.addEventListener('resize', syncDiscTonearm, { passive: true });
   window.addEventListener('scroll', syncDiscTonearm, { passive: true, capture: true });
   updateBackgroundTabMode();
@@ -3171,14 +3240,14 @@
 
   chrome.storage.local.get({
     enabled: true, themeEnabled: true, imageOnlyMode: false, spotifyCanvasEnabled: true, canvasPriority: 'apple', sponsorBlockEnabled: true,
-    discStyleEnabled: false,
+    discStyleEnabled: false, discShineEnabled: true,
     playerTabIcons: true,
     kawarpEnabled: false, kawarpPauseWhenInactive: true, eqEnabled: false, resourceSaverEnabled: false,
     kawarpWarpIntensity: 1.0, kawarpBlurPasses: 6, kawarpAnimationSpeed: 4.15,
     kawarpTransitionDuration: 0, kawarpSaturation: 2.6, kawarpDithering: 0.034, kawarpOpacity: 1.0, kawarpBrightness: 0.5,
   }, ({
     enabled, themeEnabled, imageOnlyMode: imgOnly, spotifyCanvasEnabled: spCanvas, canvasPriority: canvasPrio, sponsorBlockEnabled: sbEnabled,
-    discStyleEnabled: discStyle,
+    discStyleEnabled: discStyle, discShineEnabled: discShine,
     playerTabIcons: tabIcons,
     kawarpEnabled: kwEnabled, kawarpPauseWhenInactive: kwPause, eqEnabled: eqEnabled_, resourceSaverEnabled: rsEnabled,
     kawarpWarpIntensity, kawarpBlurPasses, kawarpAnimationSpeed, kawarpTransitionDuration, kawarpSaturation, kawarpDithering, kawarpOpacity, kawarpBrightness,
@@ -3187,6 +3256,7 @@
     resourceSaver = rsEnabled === true;
     appleUserEnabled = enabled !== false && discStyle !== true;
     spotifyCanvasEnabled = spCanvas !== false && discStyle !== true;
+    applyDiscShine(discShine);
     applyDiscStyle(discStyle);
     applyPlayerTabIcons(tabIcons);
     canvasPriority = canvasPrio === 'apple' ? 'apple' : 'spotify';
@@ -3488,6 +3558,7 @@
         appleCanvasEnabled = appleUserEnabled && !resourceSaver;
         reCheckCanvas = true;
       }
+      if ('discShineEnabled' in msg) applyDiscShine(msg.discShineEnabled);
       if ('discStyleEnabled' in msg) {
         applyDiscStyle(msg.discStyleEnabled);
         if (discStyleEnabled) {

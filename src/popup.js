@@ -16,6 +16,10 @@
   const kwPauseWhenInactive = document.getElementById('kwPauseWhenInactive');
   const themeToggle  = document.getElementById('themeToggle');
   const discStyleToggle = document.getElementById('discStyleToggle');
+  const discShineToggle = document.getElementById('discShineToggle');
+  const discShineGroup = document.getElementById('discShineGroup');
+  // The shine option only means something while Vinyl disc artwork is on.
+  const setDiscShineVisible = (on) => { if (discShineGroup) discShineGroup.style.display = on ? '' : 'none'; };
   const playerTabIconsToggle = document.getElementById('playerTabIconsToggle');
   const lyricsToggle = document.getElementById('lyricsToggle');
   const autoSwitchToggle = document.getElementById('autoSwitchToggle');
@@ -491,10 +495,22 @@
   chrome.storage.local.get({ discStyleEnabled: false }, ({ discStyleEnabled }) => {
     discStyleToggle.checked = discStyleEnabled === true;
     setDiscStyleControlLock(discStyleEnabled === true);
+    setDiscShineVisible(discStyleEnabled === true);
+  });
+
+  chrome.storage.local.get({ discShineEnabled: true }, ({ discShineEnabled }) => {
+    discShineToggle.checked = discShineEnabled !== false;
+  });
+
+  discShineToggle.addEventListener('change', () => {
+    const discShineEnabled = discShineToggle.checked;
+    chrome.storage.local.set({ discShineEnabled });
+    relay({ discShineEnabled });
   });
 
   discStyleToggle.addEventListener('change', () => {
     const discStyleEnabled = discStyleToggle.checked;
+    setDiscShineVisible(discStyleEnabled);
     chrome.storage.local.get({ enabled: true, spotifyCanvasEnabled: true, discArtworkPrevious: null }, (current) => {
       if (discStyleEnabled) {
         const previous = current.discArtworkPrevious || {
