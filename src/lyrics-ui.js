@@ -92,7 +92,11 @@
 
   chrome.storage.local.get(
     { lyricsEnabled: true, autoSwitchLyrics: true, lyricsShowForVideos: false, dancerOnNotFound: true, resourceSaverEnabled: false, lyricsAlign: 'center', lyricsAnimationStyle: 'apple', lyricsFont: 'default', lyricsRoman: 'off', lyricsRomanJa: true, lyricsRomanLangs: null },
-    (s) => { settings = s; applyLyricsStyleClasses(); }
+    (s) => {
+      settings = s;
+      if (settings.lyricsAnimationStyle === 'fluidglow' || settings.lyricsAnimationStyle === 'spring') settings.lyricsAnimationStyle = 'fluid';
+      applyLyricsStyleClasses();
+    }
   );
 
   chrome.runtime.onMessage.addListener((msg) => {
@@ -733,6 +737,234 @@
     }
   }
 
+  // ── Fluid flow ───────────────────────────────────────────────────────────
+  // Modelled on how the Better Lyrics engine (@braccato/core, MIT) moves:
+  //  • Scrolling: the scroller jumps instantly, then every nearby line glides
+  //    from its old position to its new one. All lines start together; lines
+  //    further along the direction of travel get a slightly LONGER duration, so
+  //    they trail rather than start late. Easing is a strong ease-in-out
+  //    (slow start, quick middle, soft landing). The active line is parked at
+  //    ~37% of the panel height, and the scroll starts ~0.54s before the line
+  //    is sung, so motion is already under way when the words begin.
+  //  • Words: split into letters. A soft colour front sweeps through them; each
+  //    letter floats up as the front lights it, crests, and settles slightly
+  //    raised. Long words also swell a little. The word gets a faint horizontal
+  //    wobble and a glow that fades out.
+  const isFluidStyle = () => settings.lyricsAnimationStyle === 'fluid';
+  const isGlowStyle = () => settings.lyricsAnimationStyle === 'glow';
+
+  const FLUID_SCROLL_LEAD_MS = 540;
+  const FLUID_SCROLL_RATIO = 0.37;
+  const FLUID_SCROLL_BASE_MS = 750;
+  const FLUID_SCROLL_EASING = 'cubic-bezier(0.86, 0, 0.2, 1)';
+  const FLUID_WAVE_MS = 900;
+  const FLUID_WAVE_CREST = 0.4;
+  const FLUID_LONG_WORD_MS = 1500;
+  let fluidScrollEl = null; // the line the last fluid scroll was aimed at
+
+  function findScrollParent(el) {
+    for (let p = el && el.parentElement; p && p !== document.body; p = p.parentElement) {
+      const oy = getComputedStyle(p).overflowY;
+      if ((oy === 'auto' || oy === 'scroll') && p.scrollHeight > p.clientHeight + 1) return p;
+    }
+    return findTabContentHost();
+  }
+
+  const currentTranslateY = (el) => {
+    const t = getComputedStyle(el).translate; // "none" | "0px 12.5px"
+    if (!t || t === 'none') return 0;
+    return parseFloat(t.split(' ')[1]) || 0;
+  };
+
+  function scrollToActive(active) {
+    if (!active) return;
+    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!isFluidStyle() || reduce || typeof active.animate !== 'function') {
+      active.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      return;
+    }
+    const host = findScrollParent(active);
+    if (!host) { active.scrollIntoView({ block: 'center', behavior: 'smooth' }); return; }
+
+    // Park the line's centre at ~37% of the panel. Any in-flight glide is
+    // subtracted so a mid-animation line is measured at its layout position.
+    const hostRect = host.getBoundingClientRect();
+    const aRect = active.getBoundingClientRect();
+    const aCenter = aRect.top - currentTranslateY(active) + aRect.height / 2;
+    const want = host.scrollTop + (aCenter - (hostRect.top + hostRect.height * FLUID_SCROLL_RATIO));
+    const target = Math.max(0, Math.min(want, host.scrollHeight - host.clientHeight));
+    const d = target - host.scrollTop;
+    if (Math.abs(d) < 1) return;
+
+    const lines = Array.from(active.parentElement.querySelectorAll('.vivi-lyrics-line'));
+    const ai = lines.indexOf(active);
+    const WINDOW = 14;
+    const near = [];
+    lines.forEach((el, i) => { if (Math.abs(i - ai) <= WINDOW) near.push({ el, i }); });
+
+    // Gap between the active line and its closest neighbour: when the scroll is
+    // longer than that, trailing lines are held closer to the active line's
+    // duration so the lines don't visibly pile into each other.
+    const centerOf = (el) => { const r = el.getBoundingClientRect(); return r.top - currentTranslateY(el) + r.height / 2; };
+    const gaps = [lines[ai - 1], lines[ai + 1]].filter(Boolean).map((el) => Math.abs(centerOf(el) - aCenter));
+    const stepPx = gaps.length ? Math.min(...gaps) : aRect.height;
+    const stagger = Math.min(1, stepPx / Math.abs(d));
+
+    const prev = host.style.scrollBehavior;
+    host.style.scrollBehavior = 'auto';
+    host.scrollTop = target;
+    host.style.scrollBehavior = prev;
+
+    // A seek across most of the song: don't fly every line across the screen.
+    if (Math.abs(d) > host.clientHeight * 1.2) return;
+
+    const forward = d > 0;
+    near.forEach(({ el, i }) => {
+      const rel = i - ai;
+      const abs = Math.abs(rel);
+      const ahead = forward ? rel > 0 : rel < 0; // lines in the direction of travel
+      let dur = FLUID_SCROLL_BASE_MS;
+      if (rel !== 0) {
+        const raw = ahead
+          ? FLUID_SCROLL_BASE_MS + Math.log(abs + 2) * 80 + (abs + 1) * 20
+          : FLUID_SCROLL_BASE_MS + Math.min(abs, 6) * 20;
+        dur = FLUID_SCROLL_BASE_MS + (raw - FLUID_SCROLL_BASE_MS) * stagger;
+      }
+      // composite:'add' stacks on any glide still running, so rapid line
+      // changes blend instead of restarting.
+      el.animate(
+        [{ translate: '0 ' + d + 'px' }, { translate: '0 0' }],
+        { duration: dur, easing: FLUID_SCROLL_EASING, composite: 'add', fill: 'none' }
+      );
+    });
+  }
+
+  // ── Fluid flow: per-letter word animation ──
+  const flowAnims = new Set();
+  const segmentGraphemes = (() => {
+    try {
+      const seg = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+      return (t) => Array.from(seg.segment(t), (x) => x.segment);
+    } catch { return (t) => Array.from(t); }
+  })();
+  // Scripts where splitting into letters is safe. Joined scripts (Arabic, Indic,
+  // Thai …) would lose their shaping, so those words keep the plain sweep.
+  const FLOW_SAFE = /^[\p{Script=Latin}\p{Script=Cyrillic}\p{Script=Greek}\p{Script=Hangul}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}\p{N}\p{P}\p{S}\p{Zs}\p{M}]+$/u;
+
+  function canFlow(w) {
+    if (w.querySelector('.vivi-fl-ch')) return true;
+    if (w.childElementCount) return false;
+    const t = w.textContent || '';
+    return t.trim().length > 0 && t.length <= 32 && FLOW_SAFE.test(t);
+  }
+
+  function splitIntoLetters(w) {
+    const existing = w.querySelectorAll('.vivi-fl-ch');
+    if (existing.length) return Array.from(existing);
+    const frag = document.createDocumentFragment();
+    const out = [];
+    segmentGraphemes(w.textContent || '').forEach((c) => {
+      const s = document.createElement('span');
+      s.className = 'vivi-fl-ch';
+      s.textContent = c;
+      frag.appendChild(s);
+      out.push(s);
+    });
+    w.textContent = '';
+    w.appendChild(frag);
+    w.classList.add('vivi-fl-split');
+    return out;
+  }
+
+  function cancelFlow(root) {
+    root.getAnimations({ subtree: true }).forEach((a) => { if (a.__viviFl) a.cancel(); });
+    root.querySelectorAll('.vivi-fl-lit').forEach((el) => el.classList.remove('vivi-fl-lit'));
+  }
+
+  function unsplitLetters(root) {
+    (root || document).querySelectorAll('.vivi-fl-split').forEach((w) => {
+      cancelFlow(w);
+      w.textContent = w.textContent;
+      w.classList.remove('vivi-fl-split');
+    });
+  }
+
+  function bindFlowVideo() {
+    const v = getVideoEl();
+    if (!v || v.__viviFlBound) return;
+    v.__viviFlBound = true;
+    // Web animations run on their own clock, so keep them in step with the song.
+    v.addEventListener('pause', () => flowAnims.forEach((a) => a.pause()));
+    v.addEventListener('play', () => flowAnims.forEach((a) => a.play()));
+    v.addEventListener('ratechange', () => flowAnims.forEach((a) => { a.playbackRate = v.playbackRate || 1; }));
+  }
+
+  function startFlowAnim(el, keyframes, options, elapsedMs, onDone) {
+    const a = el.animate(keyframes, options);
+    a.__viviFl = true;
+    a.currentTime = elapsedMs;
+    const v = getVideoEl();
+    a.playbackRate = (v && v.playbackRate) || 1;
+    flowAnims.add(a);
+    const done = (cancel) => { flowAnims.delete(a); if (onDone) onDone(); if (cancel) { try { a.cancel(); } catch { /* gone */ } } };
+    a.addEventListener('finish', () => done(true), { once: true });
+    a.addEventListener('cancel', () => flowAnims.delete(a), { once: true });
+    return a;
+  }
+
+  function flowWord(w, state, prevState, elapsedMs, durMs) {
+    if (state === 'upcoming') { cancelFlow(w); return; }
+    if (state === 'sung') {
+      // Normal hand-over from 'active': let the tail of the wave finish.
+      // Anything else (a seek landed past it): drop to the resting state.
+      if (prevState !== 'active') cancelFlow(w);
+      return;
+    }
+    bindFlowVideo();
+    cancelFlow(w);
+    const letters = splitIntoLetters(w);
+    const n = letters.length;
+    if (!n) return;
+    const D = Math.max(160, durMs);
+    const lead = D * 0.1;                       // the front starts a touch early
+    const per = D / n;                          // time the front spends per letter
+    const fillMs = Math.max(per * 2, 140);      // soft edge spans about two letters
+    const riseMs = FLUID_WAVE_MS * FLUID_WAVE_CREST;
+    const long = D > FLUID_LONG_WORD_MS;
+    const rest = long ? ' scale(1)' : '';
+    const peak = 'translateY(-0.05em)' + (long ? ' scale(1.11)' : '');
+
+    letters.forEach((el, i) => {
+      const touched = i * per - lead;           // front reaches this letter
+      const lit = touched + fillMs;             // letter fully coloured
+      startFlowAnim(el,
+        [{ backgroundPosition: '100% 0' }, { backgroundPosition: '0% 0' }],
+        { duration: fillMs, delay: touched, easing: 'linear', fill: 'both' },
+        elapsedMs, () => el.classList.add('vivi-fl-lit'));
+      // Each letter crests just as the front finishes colouring it.
+      let wDelay; let wDur;
+      if (lit - riseMs > touched) { wDelay = touched; wDur = (lit - touched) / FLUID_WAVE_CREST; }
+      else { wDelay = lit - riseMs; wDur = FLUID_WAVE_MS; }
+      startFlowAnim(el, [
+        { transform: 'translateY(0)' + rest, easing: 'ease-in-out' },
+        { transform: peak, offset: FLUID_WAVE_CREST, easing: 'ease-out' },
+        { transform: 'translateY(-0.02em)' + rest },
+      ], { duration: wDur, delay: wDelay, fill: 'forwards' }, elapsedMs);
+    });
+
+    // Whole word: a faint sideways wobble and a glow that fades away.
+    startFlowAnim(w, [
+      { transform: 'scaleX(1)' },
+      { transform: 'translateX(0.05em) scaleX(1.025)', offset: 0.125, easing: 'ease-in-out' },
+      { transform: 'translateX(0) scaleX(1)', offset: 0.75 },
+      { transform: 'scaleX(1)', easing: 'ease-out' },
+    ], { duration: 1000, easing: 'ease', fill: 'forwards' }, elapsedMs);
+    startFlowAnim(w, [
+      { filter: 'drop-shadow(0 0 0.8rem rgba(255,255,255,0.55))' },
+      { filter: 'drop-shadow(0 0 0 rgba(255,255,255,0))' },
+    ], { duration: Math.max(D * 1.2, 1200), easing: 'ease', fill: 'none' }, elapsedMs);
+  }
+
   // Apple Music style blurs lines progressively the further they are from the
   // active line. Store each line's distance as a CSS variable.
   function updateLineDistances(listEl) {
@@ -766,10 +998,12 @@
     const forceLeft = settings.lyricsAnimationStyle === 'zoom' || settings.lyricsAnimationStyle === 'apple';
     list.classList.remove('vivi-lyrics-align-left', 'vivi-lyrics-align-center', 'vivi-lyrics-align-right');
     list.classList.add('vivi-lyrics-align-' + (forceLeft ? 'left' : (settings.lyricsAlign || 'center')));
-    list.classList.toggle('vivi-lyrics-anim-glow', settings.lyricsAnimationStyle === 'glow');
+    list.classList.toggle('vivi-lyrics-anim-glow', isGlowStyle());
+    list.classList.toggle('vivi-lyrics-anim-fluid', isFluidStyle());
     list.classList.toggle('vivi-lyrics-anim-bounce', settings.lyricsAnimationStyle === 'bounce');
     list.classList.toggle('vivi-lyrics-anim-zoom', settings.lyricsAnimationStyle === 'zoom');
     list.classList.toggle('vivi-lyrics-anim-apple', settings.lyricsAnimationStyle === 'apple');
+    if (!isFluidStyle()) { unsplitLetters(list); fluidScrollEl = null; }
     updateLineDistances(list);
     // Lyrics-only font: swap just the vivi-lyrics-font-* class on the list.
     [...list.classList].filter((c) => c.startsWith('vivi-lyrics-font-')).forEach((c) => list.classList.remove(c));
@@ -1020,6 +1254,7 @@
     panel.appendChild(frag);
     activeLineEl = null;
     anchorLineEl = null;
+    fluidScrollEl = null;
 
     // New song -> start at the top. The scroll container keeps the previous
     // song's scroll offset (we were parked at the last line + credit row), so
@@ -1113,7 +1348,18 @@
       activeLineEl = active;
       if (active) anchorLineEl = active;
       updateLineDistances();
-      active?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      if (!isFluidStyle()) scrollToActive(active);
+    }
+
+    // Fluid flow scrolls ahead of the line being sung, so the glide is already
+    // under way when its first word lights up.
+    if (isFluidStyle()) {
+      const ahead = nowMs + FLUID_SCROLL_LEAD_MS;
+      let target = null;
+      for (const el of lineEls) {
+        if (ahead >= Number(el.dataset.start) && ahead < Number(el.dataset.end)) { target = el; break; }
+      }
+      if (target && target !== fluidScrollEl) { fluidScrollEl = target; scrollToActive(target); }
     }
 
     if ((currentResult.mode === 'word' || currentResult.mode === 'syllable') && active) {
@@ -1130,13 +1376,14 @@
         // Only touch the DOM when a word's state actually changes, so the
         // fill transition isn't restarted every animation frame.
         if (w.dataset.fillState === state) return;
+        const prevState = w.dataset.fillState;
         w.dataset.fillState = state;
         w.classList.toggle('vivi-lyrics-word-sung', state === 'sung');
 
         // Long-held syllables slowly swell while they're being sung.
         if (w.classList.contains('vivi-lyrics-syl')) {
           const held = we - ws;
-          if (state === 'active' && held >= 900 && settings.lyricsAnimationStyle !== 'bounce') {
+          if (state === 'active' && held >= 900 && settings.lyricsAnimationStyle !== 'bounce' && !isFluidStyle()) {
             w.style.setProperty('--vivi-dur', held + 'ms');
             w.classList.remove('vivi-lyrics-syl-swell');
             void w.offsetWidth;
@@ -1146,7 +1393,7 @@
           }
         }
 
-        if (settings.lyricsAnimationStyle === 'glow') {
+        if (isGlowStyle()) {
           // Glow-up: instead of a sweeping gradient fill, the word snaps to
           // "sung" color and gets a brief glow pulse exactly as it starts,
           // fading back out over the rest of its spoken duration.
@@ -1170,6 +1417,8 @@
           } else {
             w.classList.remove('vivi-lyrics-word-bouncing');
           }
+        } else if (isFluidStyle() && canFlow(w)) {
+          flowWord(w, state, prevState, nowMs - ws, we - ws);
         } else if (state === 'sung') {
           // Snap straight to fully filled (covers seeks/skips landing past
           // the word's end without ever passing through 'active').

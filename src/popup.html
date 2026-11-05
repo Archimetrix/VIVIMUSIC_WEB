@@ -1336,9 +1336,10 @@
         <option value="bounce">Word bounce</option>
         <option value="zoom">Smooth zoom</option>
         <option value="apple">Apple Music</option>
+        <option value="fluid">Fluid flow</option>
       </select>
     </div>
-    <p class="theme-sub">Fill sweep: karaoke-style left-to-right fill on the current word. Glow up: the current word lights up with a soft glow instead. Word bounce: each word pops with a little spring as it's sung. Smooth zoom: the current line scales up while the others shrink back. Apple Music: big bold lines with the others softly blurred. Smooth zoom and Apple Music are always left-aligned.</p>
+    <p class="theme-sub">Fill sweep: karaoke-style left-to-right fill on the current word. Glow up: the current word lights up with a soft glow instead. Word bounce: each word pops with a little spring as it's sung. Smooth zoom: the current line scales up while the others shrink back. Apple Music: big bold lines with the others softly blurred. Smooth zoom and Apple Music are always left-aligned. Fluid flow: modelled on Better Lyrics' engine. Lines glide up together with a soft ease and the scroll starts just before a line is sung; the word being sung lights up letter by letter, each letter floating up as the colour reaches it.</p>
 
     <div class="row" style="margin-top:8px;">
       <span class="row-label">Lyrics font</span>
@@ -1406,8 +1407,8 @@
         <label class="switch small"><input type="checkbox" id="prov-lrcred" checked/><span class="slider"></span></label>
       </div>
       <div class="provider-row">
-        <span>Better Lyrics</span><span class="lvls"><i class="lvl lvl-syllable">SYLLABLE</i><i class="lvl lvl-line">LINE</i></span>
-        <label class="switch small"><input type="checkbox" id="prov-betterlyricsTTML" checked/><span class="slider"></span></label>
+        <span>Better Lyrics</span><span class="lvls"><i class="lvl lvl-syllable">SYLLABLE</i><i class="lvl lvl-word">WORD</i><i class="lvl lvl-line">LINE</i></span>
+        <label class="switch small"><input type="checkbox" id="prov-betterlyrics" checked/><span class="slider"></span></label>
       </div>
       <div class="provider-row">
         <span>Better Lyrics Unison</span><span class="lvls"><i class="lvl lvl-syllable">SYLLABLE</i><i class="lvl lvl-word">WORD</i><i class="lvl lvl-line">LINE</i></span>
@@ -1418,24 +1419,12 @@
         <label class="switch small"><input type="checkbox" id="prov-binilyrics" checked/><span class="slider"></span></label>
       </div>
       <div class="provider-row">
-        <span>Better Lyrics Portato</span><span class="lvls"><i class="lvl lvl-word">WORD</i></span>
-        <label class="switch small"><input type="checkbox" id="prov-betterlyricsPortato" checked/><span class="slider"></span></label>
-      </div>
-      <div class="provider-row">
         <span>Musixmatch</span><span class="lvls"><i class="lvl lvl-word">WORD</i><i class="lvl lvl-line">LINE</i></span>
         <label class="switch small"><input type="checkbox" id="prov-musixmatch" checked/><span class="slider"></span></label>
       </div>
       <div class="provider-row">
         <span>LRCLIB</span><span class="lvls"><i class="lvl lvl-line">LINE</i></span>
         <label class="switch small"><input type="checkbox" id="prov-lrclib" checked/><span class="slider"></span></label>
-      </div>
-      <div class="provider-row">
-        <span>Better Lyrics Legato</span><span class="lvls"><i class="lvl lvl-line">LINE</i></span>
-        <label class="switch small"><input type="checkbox" id="prov-betterlyricsKugou" checked/><span class="slider"></span></label>
-      </div>
-      <div class="provider-row">
-        <span>Better Lyrics Legacy</span><span class="lvls"><i class="lvl lvl-line">LINE</i></span>
-        <label class="switch small"><input type="checkbox" id="prov-betterlyricsLegacy" checked/><span class="slider"></span></label>
       </div>
       <div class="provider-row">
         <span>Spotify (Needs Spotify Account Connected)</span><span class="lvls"><i class="lvl lvl-line">LINE</i></span>
@@ -1509,6 +1498,14 @@
       </label>
     </div>
     <p class="theme-sub">Replace Up next, Lyrics, Comments, and Related labels with icons. The active tab glows.</p>
+    <div class="row" style="margin-top:10px;">
+      <span class="row-label">Floating pill player bar</span>
+      <label class="switch">
+        <input type="checkbox" id="pillPlayerToggle" checked/>
+        <span class="slider"></span>
+      </label>
+    </div>
+    <p class="theme-sub">Turns the bottom player bar into a centred, rounded liquid-glass pill that floats above the page.</p>
   </div>
 
   <!-- Artwork cache -->

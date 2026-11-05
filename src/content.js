@@ -2196,6 +2196,10 @@
     });
   }
 
+  function applyPillPlayer(enabled) {
+    document.documentElement.classList.toggle('vivi-pill-player', enabled !== false);
+  }
+
   function applyPlayerTabIcons(enabled) {
     playerTabIconsEnabled = enabled !== false;
     document.documentElement.classList.toggle('vivi-player-tab-icons', playerTabIconsEnabled);
@@ -3259,6 +3263,7 @@
     applyDiscShine(discShine);
     applyDiscStyle(discStyle);
     applyPlayerTabIcons(tabIcons);
+    chrome.storage.local.get({ pillPlayerEnabled: true }, ({ pillPlayerEnabled }) => applyPillPlayer(pillPlayerEnabled));
     canvasPriority = canvasPrio === 'apple' ? 'apple' : 'spotify';
     sponsorUserEnabled = sbEnabled !== false;
     themeUserEnabled = themeEnabled;
@@ -3574,6 +3579,7 @@
         applyTheme(msg.themeEnabled);
       }
       if ('playerTabIcons' in msg) applyPlayerTabIcons(msg.playerTabIcons);
+      if ('pillPlayerEnabled' in msg) applyPillPlayer(msg.pillPlayerEnabled);
       if ('spotifyCanvasEnabled' in msg) {
         spotifyCanvasEnabled = msg.spotifyCanvasEnabled !== false && !discStyleEnabled;
         reCheckCanvas = true;

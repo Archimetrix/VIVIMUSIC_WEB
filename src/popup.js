@@ -21,6 +21,7 @@
   // The shine option only means something while Vinyl disc artwork is on.
   const setDiscShineVisible = (on) => { if (discShineGroup) discShineGroup.style.display = on ? '' : 'none'; };
   const playerTabIconsToggle = document.getElementById('playerTabIconsToggle');
+  const pillPlayerToggle = document.getElementById('pillPlayerToggle');
   const lyricsToggle = document.getElementById('lyricsToggle');
   const autoSwitchToggle = document.getElementById('autoSwitchToggle');
   const videoLyricsToggle = document.getElementById('videoLyricsToggle');
@@ -126,10 +127,7 @@
 
   const DEFAULT_PROVIDERS = {
     lrcred: true,
-    betterlyricsTTML: true,
-    betterlyricsKugou: true,
-    betterlyricsLegacy: true,
-    betterlyricsPortato: true,
+    betterlyrics: true,
     lrclib: true,
     musixmatch: true,
     unison: true,
@@ -137,6 +135,17 @@
     spotify: true,
   };
   const PROVIDER_KEYS = Object.keys(DEFAULT_PROVIDERS);
+  // Old builds had four separate Better Lyrics toggles; fold them into one.
+  const LEGACY_BL_KEYS = ['betterlyricsTTML', 'betterlyricsKugou', 'betterlyricsLegacy', 'betterlyricsPortato'];
+  function normalizeProviders(p) {
+    const out = { ...(p || {}) };
+    if (!('betterlyrics' in out)) {
+      const had = LEGACY_BL_KEYS.filter((k) => k in out);
+      if (had.length) out.betterlyrics = had.some((k) => out[k]);
+    }
+    LEGACY_BL_KEYS.forEach((k) => { delete out[k]; });
+    return out;
+  }
 
   // Provider display names for the priority dropdowns — deliberately
   // lists ONLY syllable/word-synced providers (line-only ones can't be a top-3
@@ -144,10 +153,9 @@
   // tried only when nothing else has anything, same with priority on or off).
   const PRIORITY_PROVIDER_LABELS = {
     lrcred: 'lrc.red (Syllable / Word)',
-    betterlyricsTTML: 'Better Lyrics (Syllable)',
+    betterlyrics: 'Better Lyrics (Syllable / Word)',
     unison: 'Better Lyrics Unison (Syllable / Word)',
     binilyrics: 'BiniLyrics (Syllable)',
-    betterlyricsPortato: 'Better Lyrics Portato (Word)',
     musixmatch: 'Musixmatch (Word)',
   };
   const PRIORITY_KEYS = Object.keys(PRIORITY_PROVIDER_LABELS);
@@ -191,13 +199,14 @@
         ? ROMAN_LANGS.map((l) => l.id).filter((id) => lyricsRomanLangs.includes(id))
         : ROMAN_LANGS.map((l) => l.id);
       paintRomanLangs();
+      if (lyricsAnimationStyle === 'fluidglow' || lyricsAnimationStyle === 'spring') lyricsAnimationStyle = 'fluid';
       lyricsAnimSelect.value = lyricsAnimationStyle;
       if (lyricsAnimSelect.value !== lyricsAnimationStyle) lyricsAnimSelect.value = 'apple';
       syncAlignLock();
       lyricsFontSelect.value = lyricsFont;
       if (lyricsFontSelect.value !== lyricsFont) lyricsFontSelect.value = 'default';
       showLyricsFontPreview(lyricsFontSelect.value);
-      const merged = { ...DEFAULT_PROVIDERS, ...lyricsProviders };
+      const merged = { ...DEFAULT_PROVIDERS, ...normalizeProviders(lyricsProviders) };
       PROVIDER_KEYS.forEach((k) => {
         const el = document.getElementById('prov-' + k);
         if (el) el.checked = merged[k];
@@ -228,7 +237,7 @@
     if (!el) return;
     el.addEventListener('change', () => {
       chrome.storage.local.get({ lyricsProviders: DEFAULT_PROVIDERS }, ({ lyricsProviders }) => {
-        const merged = { ...DEFAULT_PROVIDERS, ...lyricsProviders, [k]: el.checked };
+        const merged = { ...DEFAULT_PROVIDERS, ...normalizeProviders(lyricsProviders), [k]: el.checked };
         chrome.storage.local.set({ lyricsProviders: merged });
         relay({ lyricsProviders: merged });
       });
@@ -287,7 +296,10 @@
       priorityEnabledToggle.checked = lyricsPriorityEnabled;
       priorityList.classList.toggle('open', lyricsPriorityEnabled);
       priorityWaitToggle.checked = lyricsPriorityWaitEnabled !== false;
-      populatePrioritySelects((lyricsPriorityOrder || []).filter((k) => PRIORITY_KEYS.includes(k)).slice(0, PRIORITY_SLOT_COUNT));
+      populatePrioritySelects((lyricsPriorityOrder || [])
+        .map((k) => (LEGACY_BL_KEYS.includes(k) ? 'betterlyrics' : k))
+        .filter((k, i, a) => PRIORITY_KEYS.includes(k) && a.indexOf(k) === i)
+        .slice(0, PRIORITY_SLOT_COUNT));
     }
   );
 
@@ -481,6 +493,16 @@
     const playerTabIcons = playerTabIconsToggle.checked;
     chrome.storage.local.set({ playerTabIcons });
     relay({ playerTabIcons });
+  });
+
+  chrome.storage.local.get({ pillPlayerEnabled: true }, ({ pillPlayerEnabled }) => {
+    pillPlayerToggle.checked = pillPlayerEnabled !== false;
+  });
+
+  pillPlayerToggle.addEventListener('change', () => {
+    const pillPlayerEnabled = pillPlayerToggle.checked;
+    chrome.storage.local.set({ pillPlayerEnabled });
+    relay({ pillPlayerEnabled });
   });
 
   function setDiscStyleControlLock(enabled) {

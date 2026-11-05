@@ -7,7 +7,7 @@
 **Apple Music–style Canvas artwork, Spotify Canvas, synced lyrics with romanization, a built-in equalizer, crossfade between songs, Last.fm scrobbling, Spotify → YouTube Music playlist transfer tool for YouTube Music and many more.**
 
 [![Manifest](https://img.shields.io/badge/Manifest-V3-ff6b6b?style=flat-square)](#)
-[![Version](https://img.shields.io/badge/Version-10.1.1-4ecdc4?style=flat-square)](#)
+[![Version](https://img.shields.io/badge/Version-10.2.0-4ecdc4?style=flat-square)](#)
 [![Browsers](https://img.shields.io/badge/Chrome%20%7CFirefox%20%7C%20All%20Firefox%20Based%20Browsers%20%7cAll%20Chromium%20Browsers-supported-6c5ce7?style=flat-square)](#)
 [![Copyright](https://img.shields.io/badge/Copyright-%C2%A9%202026%20Archimetrix.%20All%20rights%20reserved-f39c12?style=flat-square)](LICENSE)
 </div>
@@ -82,17 +82,14 @@ This extension is **not published on the Chrome Web Store**. It's distributed as
 - 🎤 **Synced Lyrics** — Syllable-synced lyrics when available, then word-synced, then line-synced, then plain lyrics. Pulled from multiple providers so you almost always get *something*.
 - 🔀 **Multiple Lyrics Providers** — Toggle individual sources on or off:
   - lrc.red
-  - Better Lyrics (word/syllable-sync, TTML)
+  - Better Lyrics (one toggle; tries syllable/word-sync sources first — TTML and QQ Music "Portato" — then falls back to Kugou "Legato" and "Legacy" line-sync)
   - Better Lyrics Unison
-  - Better Lyrics Portato
-  - Better Lyrics Legato (Kugou)
-  - Better Lyrics Legacy
   - BiniLyrics
   - Musixmatch
   - LRCLIB
   - Spotify (needs a connected Spotify account)
 - 🔠 **Lyrics Romanization** — Show lyrics in Latin letters, written the way they sound (not translated), either instead of the original or as a small line under each original line. Korean, Japanese kana, Chinese (pinyin), Hindi, Punjabi and Georgian are converted on-device. Other scripts (for example Japanese kanji, Arabic, Cyrillic, Greek, Thai and several Indic scripts) are looked up through Google Translate only if you tick them, and only the lyric text is sent. You choose which languages are romanized.
-- ✨ **Lyrics Alignment & Highlight Animations** — Align lyrics left, center or right, and pick the current-word animation: Fill sweep, Glow up, Word bounce, Smooth zoom, or Apple Music style.
+- ✨ **Lyrics Alignment & Highlight Animations** — Align lyrics left, center or right, and pick the current-word animation: Fill sweep, Glow up, Word bounce, Smooth zoom, Apple Music style, or Fluid flow (modelled on the Better Lyrics engine: lines glide up together with a soft ease, and the current word lights up letter by letter).
 - 💃 **REZE Dance** — An animated dancer plays when no lyrics can be found for a track, toggleable in the popup.
 - ⏭️ **SponsorBlock** — Automatically skips non-music segments (spoken intros, skits, outros) of music videos using community data from [SponsorBlock](https://sponsor.ajay.app/), and keeps the lyrics timeline in sync after each skip. See [SponsorBlock](#sponsorblock) for how it works and the required attribution.
 - 🎧 **Last.fm Scrobbling** — Sign in through Last.fm's browser authorization page (or with username and password), scrobble what you listen to, send Now Playing status, and sync Likes/Unlikes as Loves/Unloves.

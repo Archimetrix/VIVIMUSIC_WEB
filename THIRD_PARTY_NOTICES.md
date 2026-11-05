@@ -17,6 +17,7 @@ named in this file. All product names, logos and trademarks belong to their resp
 | hls.js v1.5.17 | `src/vendor/hls.min.js` (unmodified) | Apache-2.0 | © 2017 Dailymotion — https://github.com/video-dev/hls.js |
 | pinyin-pro | `src/vendor/pinyin-pro.min.js` (unmodified) | MIT | © 2022-present zh-lx — https://github.com/zh-lx/pinyin-pro |
 | Kawarp (`@kawarp/core`) | `src/kawarp.js` (modified) | MIT | © 2026 Better Lyrics — https://github.com/better-lyrics/kawarp |
+| `@braccato/core` (animation timing values and technique only; code is an independent reimplementation) | `src/lyrics-ui.js` (Fluid flow), `src/canvas.css` | MIT | © 2026 Boidushya Bhattacharya — https://github.com/better-lyrics |
 | Lyrics fonts (12 families) | `src/fonts/*.woff2` (Latin subsets via Fontsource) | SIL OFL 1.1 | see section 3 |
 
 ### 1.1 hls.js — Apache License 2.0

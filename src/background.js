@@ -241,10 +241,26 @@ async function migrateLyricsDefaults() {
   // previously picked. Applied once.
   const sy = await chrome.storage.local.get({ vivi_priority_syllable_word_only: false, lyricsPriorityOrder: [] });
   if (!sy.vivi_priority_syllable_word_only) {
-    const ok = ['lrcred', 'betterlyricsTTML', 'betterlyricsPortato', 'unison', 'binilyrics', 'musixmatch'];
+    const ok = ['lrcred', 'betterlyricsTTML', 'betterlyricsPortato', 'betterlyrics', 'unison', 'binilyrics', 'musixmatch'];
     const cleaned = (Array.isArray(sy.lyricsPriorityOrder) ? sy.lyricsPriorityOrder : [])
       .filter((k, i, a) => ok.includes(k) && a.indexOf(k) === i).slice(0, 3);
     await chrome.storage.local.set({ lyricsPriorityOrder: cleaned, vivi_priority_syllable_word_only: true });
+  }
+  // Better Lyrics TTML/Legato/Portato/Legacy merged into one provider —
+  // fold old toggles and priority picks into the new 'betterlyrics' key. Once.
+  const bl = await chrome.storage.local.get({ vivi_betterlyrics_merged: false, lyricsProviders: {}, lyricsPriorityOrder: [] });
+  if (!bl.vivi_betterlyrics_merged) {
+    const OLD = ['betterlyricsTTML', 'betterlyricsKugou', 'betterlyricsLegacy', 'betterlyricsPortato'];
+    const prov = { ...bl.lyricsProviders };
+    if (!('betterlyrics' in prov)) {
+      const had = OLD.filter((k) => k in prov);
+      if (had.length) prov.betterlyrics = had.some((k) => prov[k]);
+    }
+    OLD.forEach((k) => { delete prov[k]; });
+    const order = (Array.isArray(bl.lyricsPriorityOrder) ? bl.lyricsPriorityOrder : [])
+      .map((k) => (OLD.includes(k) ? 'betterlyrics' : k))
+      .filter((k, i, a) => a.indexOf(k) === i).slice(0, 3);
+    await chrome.storage.local.set({ lyricsProviders: prov, lyricsPriorityOrder: order, vivi_betterlyrics_merged: true });
   }
   const s = await chrome.storage.local.get({
     vivi_lyrics_defaults_lrcred: false,
